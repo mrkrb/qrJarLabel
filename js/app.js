@@ -10,11 +10,17 @@
     const qrValue = document.getElementById('qr-value');
     const btnUpload = document.getElementById('btn-upload');
     const fileInput = document.getElementById('file-input');
+    const scaleControl = document.getElementById('scale-control');
+    const scaleSlider = document.getElementById('scale-slider');
+    const scaleValueLabel = document.getElementById('scale-value');
 
     let detector = null;
     let animFrameId = null;
     let lastDetectedValue = '';
     let hideTimeout = null;
+
+    // Scala immagine overlay (controllata dallo slider)
+    var imageScale = 1.0;
 
     // Cache delle immagini caricate da IndexedDB: { qrId: HTMLImageElement }
     var imageCache = {};
@@ -165,8 +171,10 @@
         // Mostra il pulsante upload solo se non c'è già un'immagine associata
         if (!imageCache[value]) {
             btnUpload.classList.remove('hidden');
+            scaleControl.classList.add('hidden');
         } else {
             btnUpload.classList.add('hidden');
+            scaleControl.classList.remove('hidden');
         }
 
         clearTimeout(hideTimeout);
@@ -175,6 +183,7 @@
                 qrResult.classList.add('hidden');
                 lastDetectedValue = '';
                 btnUpload.classList.add('hidden');
+                scaleControl.classList.add('hidden');
             }
         }, 3000);
     }
@@ -257,25 +266,34 @@
                 // Landscape: espandi orizzontalmente (allarga left/right)
                 var expand = aspectRatio; // > 1
                 var padH = (expand - 1) / 2;
-                // Sposta i punti left verso sinistra e right verso destra
                 corners = [
-                    bilerp(-padH, 0, corners),       // TL spostato a sx
-                    bilerp(1 + padH, 0, corners),   // TR spostato a dx
-                    bilerp(1 + padH, 1, corners),   // BR spostato a dx
-                    bilerp(-padH, 1, corners)        // BL spostato a sx
+                    bilerp(-padH, 0, corners),
+                    bilerp(1 + padH, 0, corners),
+                    bilerp(1 + padH, 1, corners),
+                    bilerp(-padH, 1, corners)
                 ];
             } else {
                 // Portrait: espandi verticalmente (allarga top/bottom)
                 var expand = 1 / aspectRatio; // > 1
                 var padV = (expand - 1) / 2;
-                // Sposta i punti top verso l'alto e bottom verso il basso
                 corners = [
-                    bilerp(0, -padV, corners),       // TL spostato su
-                    bilerp(1, -padV, corners),       // TR spostato su
-                    bilerp(1, 1 + padV, corners),   // BR spostato giù
-                    bilerp(0, 1 + padV, corners)    // BL spostato giù
+                    bilerp(0, -padV, corners),
+                    bilerp(1, -padV, corners),
+                    bilerp(1, 1 + padV, corners),
+                    bilerp(0, 1 + padV, corners)
                 ];
             }
+        }
+
+        // Applica la scala utente (espande/contrae dal centro del quadrilatero)
+        if (imageScale !== 1.0) {
+            var pad = (imageScale - 1) / 2;
+            corners = [
+                bilerp(-pad, -pad, corners),
+                bilerp(1 + pad, -pad, corners),
+                bilerp(1 + pad, 1 + pad, corners),
+                bilerp(-pad, 1 + pad, corners)
+            ];
         }
 
         for (var row = 0; row < n; row++) {
@@ -395,6 +413,12 @@
             handleFileUpload(file);
             fileInput.value = ''; // Reset per permettere ri-selezione stesso file
         }
+    });
+
+    // Slider scala: aggiorna il valore in tempo reale
+    scaleSlider.addEventListener('input', function () {
+        imageScale = parseFloat(scaleSlider.value);
+        scaleValueLabel.textContent = imageScale.toFixed(1) + 'x';
     });
 
     // =========================================================================
