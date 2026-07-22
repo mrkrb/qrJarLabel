@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qr-jar-label-v5';
+const CACHE_NAME = 'qr-jar-label-v6';
 const ASSETS = [
     './',
     './index.html',
@@ -6,7 +6,8 @@ const ASSETS = [
     './js/app.js',
     './manifest.json',
     './icons/icon-192.png',
-    './icons/icon-512.png'
+    './icons/icon-512.png',
+    './assets/test-label.png'
 ];
 
 // Install: cache degli asset base
