@@ -218,20 +218,29 @@
     function showQrResult(barcodes) {
         if (barcodes.length === 0) return;
 
-        // Mostra info del primo QR rilevato (per upload)
-        var first = barcodes[0];
-        var label = first.rawValue;
+        // Trova il primo QR senza immagine associata (priorità per upload)
+        var targetForUpload = null;
+        for (var i = 0; i < barcodes.length; i++) {
+            if (!imageCache[barcodes[i].rawValue]) {
+                targetForUpload = barcodes[i];
+                break;
+            }
+        }
+
+        // Label: mostra il QR target per upload, o il primo se tutti hanno immagine
+        var displayQr = targetForUpload || barcodes[0];
+        var label = displayQr.rawValue;
         if (barcodes.length > 1) {
             label += ' (+' + (barcodes.length - 1) + ')';
         }
 
         qrValue.textContent = label;
         qrResult.classList.remove('hidden');
-        currentQrId = first.rawValue;
-        lastDetectedValue = first.rawValue;
+        currentQrId = displayQr.rawValue;
+        lastDetectedValue = displayQr.rawValue;
 
-        // Mostra upload solo se il primo QR non ha immagine
-        if (!imageCache[first.rawValue]) {
+        // Mostra upload se c'è un QR senza immagine
+        if (targetForUpload) {
             btnUpload.classList.remove('hidden');
             scaleControl.classList.add('hidden');
         } else {
@@ -241,7 +250,7 @@
 
         clearTimeout(hideTimeout);
         hideTimeout = setTimeout(function () {
-            if (lastDetectedValue === first.rawValue && !sliderActive) {
+            if (lastDetectedValue === displayQr.rawValue && !sliderActive) {
                 qrResult.classList.add('hidden');
                 lastDetectedValue = '';
                 btnUpload.classList.add('hidden');
