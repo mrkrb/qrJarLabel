@@ -276,7 +276,6 @@
                     bilerp(0, 1 + padV, corners)    // BL spostato giù
                 ];
             }
-            }
         }
 
         for (var row = 0; row < n; row++) {
