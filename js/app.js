@@ -245,38 +245,37 @@
         ];
 
         // Adatta i corner points per mantenere l'aspect ratio dell'immagine.
-        // Il QR è (circa) quadrato; se l'immagine non è quadrata, restringiamo
-        // il quadrilatero lungo l'asse necessario, centrandolo.
+        // Approccio "cover": l'immagine riempie il quadrilatero del QR (che è
+        // circa quadrato) mantenendo l'aspect ratio e sbordando dove necessario.
+        // Se l'immagine è landscape, espandiamo il quadrilatero in larghezza.
+        // Se è portrait, espandiamo in altezza.
         var aspectRatio = imgW / imgH;
 
         if (aspectRatio !== 1) {
-            // Calcoliamo i vettori medi per "top" e "left" del quadrilatero
             // TL=0, TR=1, BR=2, BL=3
-            // Per un'immagine landscape (aspect > 1): restringiamo l'altezza
-            // Per un'immagine portrait (aspect < 1): restringiamo la larghezza
-
             if (aspectRatio > 1) {
-                // Landscape: restringi verticalmente (avvicina top e bottom)
-                var shrink = 1 / aspectRatio; // < 1
-                var padV = (1 - shrink) / 2;
-                // Sposta i punti top verso il basso e bottom verso l'alto
+                // Landscape: espandi orizzontalmente (allarga left/right)
+                var expand = aspectRatio; // > 1
+                var padH = (expand - 1) / 2;
+                // Sposta i punti left verso sinistra e right verso destra
                 corners = [
-                    bilerp(0, padV, corners),        // TL spostato giù
-                    bilerp(1, padV, corners),        // TR spostato giù
-                    bilerp(1, 1 - padV, corners),   // BR spostato su
-                    bilerp(0, 1 - padV, corners)    // BL spostato su
+                    bilerp(-padH, 0, corners),       // TL spostato a sx
+                    bilerp(1 + padH, 0, corners),   // TR spostato a dx
+                    bilerp(1 + padH, 1, corners),   // BR spostato a dx
+                    bilerp(-padH, 1, corners)        // BL spostato a sx
                 ];
             } else {
-                // Portrait: restringi orizzontalmente (avvicina left e right)
-                var shrink = aspectRatio; // < 1
-                var padH = (1 - shrink) / 2;
-                // Sposta i punti left verso destra e right verso sinistra
+                // Portrait: espandi verticalmente (allarga top/bottom)
+                var expand = 1 / aspectRatio; // > 1
+                var padV = (expand - 1) / 2;
+                // Sposta i punti top verso l'alto e bottom verso il basso
                 corners = [
-                    bilerp(padH, 0, corners),        // TL spostato a dx
-                    bilerp(1 - padH, 0, corners),   // TR spostato a sx
-                    bilerp(1 - padH, 1, corners),   // BR spostato a sx
-                    bilerp(padH, 1, corners)         // BL spostato a dx
+                    bilerp(0, -padV, corners),       // TL spostato su
+                    bilerp(1, -padV, corners),       // TR spostato su
+                    bilerp(1, 1 + padV, corners),   // BR spostato giù
+                    bilerp(0, 1 + padV, corners)    // BL spostato giù
                 ];
+            }
             }
         }
 
