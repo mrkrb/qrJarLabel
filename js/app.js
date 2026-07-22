@@ -240,6 +240,7 @@
         ctx.setTransform(m11, m21, m12, m22, m13, m23);
         ctx.drawImage(img, 0, 0, imgW, imgH, 0, 0, imgW, imgH);
         ctx.restore();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
 
     function drawWarpedImage(img, cornerPoints) {
@@ -391,7 +392,10 @@
                 cleanupSmoothState(activeIds);
 
                 showQrResult(barcodes);
-                setStatus(barcodes.length === 1 ? 'QR rilevato' : barcodes.length + ' QR rilevati', 'scanning');
+                var statusMsg = barcodes.length === 1
+                    ? 'QR: ' + barcodes[0].rawValue
+                    : barcodes.length + ' QR rilevati';
+                setStatus(statusMsg, 'scanning');
             } else {
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
                 cleanupSmoothState([]);
