@@ -29,46 +29,59 @@
     var currentQrId = null;
 
     // =========================================================================
-    // SMOOTHING TEMPORALE (EMA)
+    // SMOOTHING TEMPORALE (EMA) — PER-QR
+    //
+    // Ogni QR code rilevato ha il proprio stato di smoothing, così QR multipli
+    // non si interferiscono a vicenda.
     // =========================================================================
 
     var SMOOTH_ALPHA = 0.35;
-    var smoothedPoints = null;
-    var lastDetectTime = 0;
     var SMOOTH_TIMEOUT = 200;
 
-    function smoothCornerPoints(newPoints) {
+    // { qrId: { points: [{x,y},...], lastTime: number } }
+    var smoothState = {};
+
+    function smoothCornerPointsForQr(qrId, newPoints) {
         var now = performance.now();
-        if (!smoothedPoints || (now - lastDetectTime) > SMOOTH_TIMEOUT) {
-            smoothedPoints = newPoints.map(function (p) {
-                return { x: p.x, y: p.y };
-            });
-            lastDetectTime = now;
-            return smoothedPoints;
+        var state = smoothState[qrId];
+
+        if (!state || (now - state.lastTime) > SMOOTH_TIMEOUT) {
+            smoothState[qrId] = {
+                points: newPoints.map(function (p) { return { x: p.x, y: p.y }; }),
+                lastTime: now
+            };
+            return smoothState[qrId].points;
         }
+
         for (var i = 0; i < 4; i++) {
-            smoothedPoints[i].x = SMOOTH_ALPHA * newPoints[i].x + (1 - SMOOTH_ALPHA) * smoothedPoints[i].x;
-            smoothedPoints[i].y = SMOOTH_ALPHA * newPoints[i].y + (1 - SMOOTH_ALPHA) * smoothedPoints[i].y;
+            state.points[i].x = SMOOTH_ALPHA * newPoints[i].x + (1 - SMOOTH_ALPHA) * state.points[i].x;
+            state.points[i].y = SMOOTH_ALPHA * newPoints[i].y + (1 - SMOOTH_ALPHA) * state.points[i].y;
         }
-        lastDetectTime = now;
-        return smoothedPoints;
+        state.lastTime = now;
+        return state.points;
+    }
+
+    /**
+     * Pulisce gli stati di smoothing per QR che non sono più visibili.
+     */
+    function cleanupSmoothState(activeQrIds) {
+        var keys = Object.keys(smoothState);
+        for (var i = 0; i < keys.length; i++) {
+            if (activeQrIds.indexOf(keys[i]) === -1) {
+                delete smoothState[keys[i]];
+            }
+        }
     }
 
     // =========================================================================
     // INDEXEDDB: CARICAMENTO E UPLOAD IMMAGINI
     // =========================================================================
 
-    /**
-     * Carica un'immagine dal Blob in cache come HTMLImageElement.
-     */
     function blobToImage(blob) {
         return new Promise(function (resolve, reject) {
             var url = URL.createObjectURL(blob);
             var img = new Image();
-            img.onload = function () {
-                // Non revocare subito l'URL — serve per drawImage
-                resolve(img);
-            };
+            img.onload = function () { resolve(img); };
             img.onerror = function () {
                 URL.revokeObjectURL(url);
                 reject(new Error('Impossibile caricare immagine dal blob'));
@@ -77,9 +90,6 @@
         });
     }
 
-    /**
-     * Carica tutte le associazioni da IndexedDB nella cache immagini.
-     */
     async function loadAllImages() {
         try {
             var associations = await JarDB.getAll();
@@ -95,25 +105,16 @@
         }
     }
 
-    /**
-     * Restituisce l'immagine associata a un qrId dalla cache, o null.
-     */
     function getImageForQr(qrId) {
         return imageCache[qrId] || null;
     }
 
-    /**
-     * Gestisce l'upload di un file immagine: lo salva in IndexedDB
-     * associato al QR corrente e lo mette in cache.
-     */
     async function handleFileUpload(file) {
         if (!currentQrId) return;
-
         try {
             await JarDB.save(currentQrId, file);
             imageCache[currentQrId] = await blobToImage(file);
             setStatus('Immagine salvata per: ' + currentQrId, 'scanning');
-            console.log('Salvata associazione:', currentQrId);
         } catch (err) {
             console.error('Errore salvataggio:', err);
             setStatus('Errore salvataggio immagine', 'error');
@@ -144,7 +145,6 @@
             },
             audio: false
         };
-
         try {
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
@@ -162,14 +162,23 @@
         statusBar.className = type || '';
     }
 
-    function showQrResult(value) {
-        qrValue.textContent = value;
-        qrResult.classList.remove('hidden');
-        currentQrId = value;
-        lastDetectedValue = value;
+    function showQrResult(barcodes) {
+        if (barcodes.length === 0) return;
 
-        // Mostra il pulsante upload solo se non c'è già un'immagine associata
-        if (!imageCache[value]) {
+        // Mostra info del primo QR rilevato (per upload)
+        var first = barcodes[0];
+        var label = first.rawValue;
+        if (barcodes.length > 1) {
+            label += ' (+' + (barcodes.length - 1) + ')';
+        }
+
+        qrValue.textContent = label;
+        qrResult.classList.remove('hidden');
+        currentQrId = first.rawValue;
+        lastDetectedValue = first.rawValue;
+
+        // Mostra upload solo se il primo QR non ha immagine
+        if (!imageCache[first.rawValue]) {
             btnUpload.classList.remove('hidden');
             scaleControl.classList.add('hidden');
         } else {
@@ -179,7 +188,7 @@
 
         clearTimeout(hideTimeout);
         hideTimeout = setTimeout(function () {
-            if (lastDetectedValue === value && !sliderActive) {
+            if (lastDetectedValue === first.rawValue && !sliderActive) {
                 qrResult.classList.add('hidden');
                 lastDetectedValue = '';
                 btnUpload.classList.add('hidden');
@@ -205,20 +214,17 @@
         var sx0 = s0.x, sy0 = s0.y;
         var sx1 = s1.x, sy1 = s1.y;
         var sx2 = s2.x, sy2 = s2.y;
-
         var dx0 = d0.x, dy0 = d0.y;
         var dx1 = d1.x, dy1 = d1.y;
         var dx2 = d2.x, dy2 = d2.y;
 
         var denom = (sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1));
         if (Math.abs(denom) < 0.001) return;
-
         var invDenom = 1.0 / denom;
 
         var m11 = (dx0 * (sy1 - sy2) + dx1 * (sy2 - sy0) + dx2 * (sy0 - sy1)) * invDenom;
         var m12 = (dx0 * (sx2 - sx1) + dx1 * (sx0 - sx2) + dx2 * (sx1 - sx0)) * invDenom;
         var m13 = (dx0 * (sx1*sy2 - sx2*sy1) + dx1 * (sx2*sy0 - sx0*sy2) + dx2 * (sx0*sy1 - sx1*sy0)) * invDenom;
-
         var m21 = (dy0 * (sy1 - sy2) + dy1 * (sy2 - sy0) + dy2 * (sy0 - sy1)) * invDenom;
         var m22 = (dy0 * (sx2 - sx1) + dy1 * (sx0 - sx2) + dy2 * (sx1 - sx0)) * invDenom;
         var m23 = (dy0 * (sx1*sy2 - sx2*sy1) + dy1 * (sx2*sy0 - sx0*sy2) + dy2 * (sx0*sy1 - sx1*sy0)) * invDenom;
@@ -253,19 +259,11 @@
             { x: cornerPoints[3].x * scaleX, y: cornerPoints[3].y * scaleY }
         ];
 
-        // Adatta i corner points per mantenere l'aspect ratio dell'immagine.
-        // Approccio "cover": l'immagine riempie il quadrilatero del QR (che è
-        // circa quadrato) mantenendo l'aspect ratio e sbordando dove necessario.
-        // Se l'immagine è landscape, espandiamo il quadrilatero in larghezza.
-        // Se è portrait, espandiamo in altezza.
+        // Aspect ratio cover
         var aspectRatio = imgW / imgH;
-
         if (aspectRatio !== 1) {
-            // TL=0, TR=1, BR=2, BL=3
             if (aspectRatio > 1) {
-                // Landscape: espandi orizzontalmente (allarga left/right)
-                var expand = aspectRatio; // > 1
-                var padH = (expand - 1) / 2;
+                var padH = (aspectRatio - 1) / 2;
                 corners = [
                     bilerp(-padH, 0, corners),
                     bilerp(1 + padH, 0, corners),
@@ -273,9 +271,7 @@
                     bilerp(-padH, 1, corners)
                 ];
             } else {
-                // Portrait: espandi verticalmente (allarga top/bottom)
-                var expand = 1 / aspectRatio; // > 1
-                var padV = (expand - 1) / 2;
+                var padV = (1 / aspectRatio - 1) / 2;
                 corners = [
                     bilerp(0, -padV, corners),
                     bilerp(1, -padV, corners),
@@ -285,7 +281,7 @@
             }
         }
 
-        // Applica la scala utente (espande/contrae dal centro del quadrilatero)
+        // Scala utente
         if (imageScale !== 1.0) {
             var pad = (imageScale - 1) / 2;
             corners = [
@@ -320,16 +316,17 @@
     }
 
     // =========================================================================
-    // OVERLAY
+    // OVERLAY — MULTI QR
     // =========================================================================
 
-    function drawOverlay(qrId, cornerPoints) {
-        ctx.clearRect(0, 0, overlay.width, overlay.height);
+    /**
+     * Disegna l'overlay per un singolo QR (immagine o poligono debug).
+     * Non fa clearRect — viene fatto una volta prima di iterare su tutti i QR.
+     */
+    function drawSingleOverlay(qrId, cornerPoints) {
         if (!cornerPoints || cornerPoints.length < 4) return;
 
-        var points = smoothCornerPoints(cornerPoints);
-
-        // Cerca immagine associata a questo QR in IndexedDB (cache)
+        var points = smoothCornerPointsForQr(qrId, cornerPoints);
         var img = getImageForQr(qrId);
 
         if (img) {
@@ -380,13 +377,24 @@
             const barcodes = await detector.detect(video);
 
             if (barcodes.length > 0) {
-                const qr = barcodes[0];
-                showQrResult(qr.rawValue);
-                drawOverlay(qr.rawValue, qr.cornerPoints);
-                setStatus('QR rilevato', 'scanning');
+                // Pulisci canvas una volta, poi disegna tutti gli overlay
+                ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+                var activeIds = [];
+                for (var i = 0; i < barcodes.length; i++) {
+                    var qr = barcodes[i];
+                    activeIds.push(qr.rawValue);
+                    drawSingleOverlay(qr.rawValue, qr.cornerPoints);
+                }
+
+                // Pulisci smoothing per QR non più visibili
+                cleanupSmoothState(activeIds);
+
+                showQrResult(barcodes);
+                setStatus(barcodes.length === 1 ? 'QR rilevato' : barcodes.length + ' QR rilevati', 'scanning');
             } else {
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
-                smoothedPoints = null;
+                cleanupSmoothState([]);
                 setStatus('Inquadra un QR code...', 'scanning');
             }
         } catch (err) {
@@ -400,22 +408,19 @@
     // EVENT HANDLERS
     // =========================================================================
 
-    // Pulsante upload: apre il file picker
     btnUpload.addEventListener('click', function (e) {
         e.stopPropagation();
         fileInput.click();
     });
 
-    // File selezionato: salva in IndexedDB
     fileInput.addEventListener('change', function () {
         var file = fileInput.files[0];
         if (file) {
             handleFileUpload(file);
-            fileInput.value = ''; // Reset per permettere ri-selezione stesso file
+            fileInput.value = '';
         }
     });
 
-    // Slider scala: aggiorna il valore in tempo reale
     var sliderActive = false;
 
     function onScaleChange() {
@@ -425,7 +430,6 @@
     scaleSlider.addEventListener('input', onScaleChange);
     scaleSlider.addEventListener('change', onScaleChange);
 
-    // Impedisci che il tocco sullo slider propaghi e causi problemi
     scaleControl.addEventListener('touchstart', function (e) {
         e.stopPropagation();
         sliderActive = true;
@@ -443,7 +447,6 @@
 
     async function init() {
         setStatus('Avvio...', '');
-
         try {
             const hasDetector = await initDetector();
             if (!hasDetector) {
@@ -452,12 +455,9 @@
             }
 
             setStatus('Caricamento dati...', '');
-
-            // Carica le immagini già salvate in IndexedDB
             await loadAllImages();
 
             setStatus('Avvio fotocamera...', '');
-
             const cameraOk = await startCamera();
             if (!cameraOk) return;
 
