@@ -71,11 +71,56 @@
         }, 3000);
     }
 
+    /**
+     * Stabilizza i corner points del QR code ricalcolando il quarto vertice.
+     *
+     * Un QR code ha per standard solo 3 finder pattern (top-left, top-right,
+     * bottom-left). Il quarto angolo (bottom-right, indice 2 nell'ordine
+     * orario restituito da BarcodeDetector) non ha un finder pattern fisico
+     * e viene solo stimato dal detector, risultando instabile ("balla").
+     *
+     * Ricalcoliamo quel vertice sfruttando la proprietà del parallelogramma:
+     * dati i 3 vertici affidabili, il quarto si ottiene come D = A + C - B,
+     * dove B è il vertice opposto (diagonale, indice 0 = top-left) e
+     * A, C sono i due vertici adiacenti a quello mancante (indici 1 e 3).
+     *
+     * Ordine BarcodeDetector (orario da top-left):
+     *   [0] top-left     (finder pattern) — opposto al vertice instabile
+     *   [1] top-right    (finder pattern) — adiacente
+     *   [2] bottom-right (SENZA finder)   — vertice instabile, da ricalcolare
+     *   [3] bottom-left  (finder pattern) — adiacente
+     */
+    function stabilizeCornerPoints(cornerPoints) {
+        if (!cornerPoints || cornerPoints.length < 4) return cornerPoints;
+
+        // Vertici affidabili (con finder pattern)
+        var A = cornerPoints[1]; // top-right, adiacente al vertice instabile
+        var B = cornerPoints[0]; // top-left, opposto (diagonale)
+        var C = cornerPoints[3]; // bottom-left, adiacente al vertice instabile
+
+        // Ricalcolo del quarto vertice come parallelogramma: D = A + C - B
+        var D = {
+            x: A.x + C.x - B.x,
+            y: A.y + C.y - B.y
+        };
+
+        // Restituisce i 4 punti nello stesso ordine, con [2] stabilizzato
+        return [
+            cornerPoints[0],
+            cornerPoints[1],
+            D,
+            cornerPoints[3]
+        ];
+    }
+
     // Disegna i corner points rilevati sul canvas overlay
     function drawCornerPoints(cornerPoints) {
         ctx.clearRect(0, 0, overlay.width, overlay.height);
 
         if (!cornerPoints || cornerPoints.length < 4) return;
+
+        // Stabilizza il quarto vertice (bottom-right, senza finder pattern)
+        var stablePoints = stabilizeCornerPoints(cornerPoints);
 
         // Calcola il fattore di scala tra video reale e canvas
         const scaleX = overlay.width / video.videoWidth;
@@ -87,9 +132,9 @@
 
         // Disegna il poligono
         ctx.beginPath();
-        ctx.moveTo(cornerPoints[0].x * scaleX, cornerPoints[0].y * scaleY);
-        for (let i = 1; i < cornerPoints.length; i++) {
-            ctx.lineTo(cornerPoints[i].x * scaleX, cornerPoints[i].y * scaleY);
+        ctx.moveTo(stablePoints[0].x * scaleX, stablePoints[0].y * scaleY);
+        for (let i = 1; i < stablePoints.length; i++) {
+            ctx.lineTo(stablePoints[i].x * scaleX, stablePoints[i].y * scaleY);
         }
         ctx.closePath();
         ctx.fill();
@@ -97,7 +142,7 @@
 
         // Disegna i punti agli angoli
         ctx.fillStyle = '#6ee7b7';
-        for (const point of cornerPoints) {
+        for (const point of stablePoints) {
             ctx.beginPath();
             ctx.arc(point.x * scaleX, point.y * scaleY, 6, 0, Math.PI * 2);
             ctx.fill();
