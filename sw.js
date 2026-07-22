@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qr-jar-label-v1';
+const CACHE_NAME = 'qr-jar-label-v2';
 const ASSETS = [
     './',
     './index.html',
@@ -35,11 +35,18 @@ self.addEventListener('activate', function (event) {
     self.clients.claim();
 });
 
-// Fetch: cache-first, fallback network
+// Fetch: network-first, fallback cache (garantisce aggiornamenti rapidi)
 self.addEventListener('fetch', function (event) {
     event.respondWith(
-        caches.match(event.request).then(function (response) {
-            return response || fetch(event.request);
+        fetch(event.request).then(function (response) {
+            // Aggiorna la cache con la risposta fresca
+            var clone = response.clone();
+            caches.open(CACHE_NAME).then(function (cache) {
+                cache.put(event.request, clone);
+            });
+            return response;
+        }).catch(function () {
+            return caches.match(event.request);
         })
     );
 });
