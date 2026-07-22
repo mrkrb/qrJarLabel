@@ -109,11 +109,64 @@
         return imageCache[qrId] || null;
     }
 
+    /**
+     * Ridimensiona un'immagine mantenendo l'aspect ratio.
+     * Max 1024px per il lato più lungo, compressione JPEG 0.85.
+     * Restituisce un Blob pronto per IndexedDB.
+     */
+    function resizeImage(file, maxSize) {
+        maxSize = maxSize || 1024;
+        return new Promise(function (resolve, reject) {
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function () {
+                var w = img.naturalWidth;
+                var h = img.naturalHeight;
+
+                // Ridimensiona solo se necessario
+                if (w > maxSize || h > maxSize) {
+                    if (w >= h) {
+                        h = Math.round(h * (maxSize / w));
+                        w = maxSize;
+                    } else {
+                        w = Math.round(w * (maxSize / h));
+                        h = maxSize;
+                    }
+                }
+
+                // Disegna su un canvas temporaneo
+                var canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                var c = canvas.getContext('2d');
+                c.drawImage(img, 0, 0, w, h);
+
+                URL.revokeObjectURL(url);
+
+                // Converti in Blob JPEG
+                canvas.toBlob(function (blob) {
+                    if (blob) {
+                        resolve(blob);
+                    } else {
+                        reject(new Error('Errore conversione immagine'));
+                    }
+                }, 'image/jpeg', 0.85);
+            };
+            img.onerror = function () {
+                URL.revokeObjectURL(url);
+                reject(new Error('Errore caricamento immagine per resize'));
+            };
+            img.src = url;
+        });
+    }
+
     async function handleFileUpload(file) {
         if (!currentQrId) return;
         try {
-            await JarDB.save(currentQrId, file);
-            imageCache[currentQrId] = await blobToImage(file);
+            setStatus('Compressione immagine...', '');
+            var resized = await resizeImage(file, 1024);
+            await JarDB.save(currentQrId, resized);
+            imageCache[currentQrId] = await blobToImage(resized);
             setStatus('Immagine salvata per: ' + currentQrId, 'scanning');
         } catch (err) {
             console.error('Errore salvataggio:', err);
