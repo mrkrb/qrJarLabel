@@ -244,6 +244,42 @@
             { x: cornerPoints[3].x * scaleX, y: cornerPoints[3].y * scaleY }
         ];
 
+        // Adatta i corner points per mantenere l'aspect ratio dell'immagine.
+        // Il QR è (circa) quadrato; se l'immagine non è quadrata, restringiamo
+        // il quadrilatero lungo l'asse necessario, centrandolo.
+        var aspectRatio = imgW / imgH;
+
+        if (aspectRatio !== 1) {
+            // Calcoliamo i vettori medi per "top" e "left" del quadrilatero
+            // TL=0, TR=1, BR=2, BL=3
+            // Per un'immagine landscape (aspect > 1): restringiamo l'altezza
+            // Per un'immagine portrait (aspect < 1): restringiamo la larghezza
+
+            if (aspectRatio > 1) {
+                // Landscape: restringi verticalmente (avvicina top e bottom)
+                var shrink = 1 / aspectRatio; // < 1
+                var padV = (1 - shrink) / 2;
+                // Sposta i punti top verso il basso e bottom verso l'alto
+                corners = [
+                    bilerp(0, padV, corners),        // TL spostato giù
+                    bilerp(1, padV, corners),        // TR spostato giù
+                    bilerp(1, 1 - padV, corners),   // BR spostato su
+                    bilerp(0, 1 - padV, corners)    // BL spostato su
+                ];
+            } else {
+                // Portrait: restringi orizzontalmente (avvicina left e right)
+                var shrink = aspectRatio; // < 1
+                var padH = (1 - shrink) / 2;
+                // Sposta i punti left verso destra e right verso sinistra
+                corners = [
+                    bilerp(padH, 0, corners),        // TL spostato a dx
+                    bilerp(1 - padH, 0, corners),   // TR spostato a sx
+                    bilerp(1 - padH, 1, corners),   // BR spostato a sx
+                    bilerp(padH, 1, corners)         // BL spostato a dx
+                ];
+            }
+        }
+
         for (var row = 0; row < n; row++) {
             for (var col = 0; col < n; col++) {
                 var u0 = col / n,       v0 = row / n;
