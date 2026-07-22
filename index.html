@@ -21,17 +21,13 @@
         <div id="qr-result" class="hidden">
             <span id="qr-value"></span>
         </div>
-        <div id="version-badge"></div>
+        <div id="version-badge">v0.0.1</div>
     </div>
     <script src="js/app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js');
         }
-        // Mostra hash commit dalla versione deployata
-        fetch('version.txt').then(r => r.text()).then(hash => {
-            document.getElementById('version-badge').textContent = hash.trim();
-        }).catch(() => {});
     </script>
 </body>
 </html>
