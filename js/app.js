@@ -17,6 +17,48 @@
     // Immagine di test per l'overlay (hardcoded per milestone 3)
     let labelImage = null;
 
+    // =========================================================================
+    // SMOOTHING TEMPORALE (EMA - Exponential Moving Average)
+    //
+    // Riduce il "ballare" dell'overlay smorzando le micro-oscillazioni dei
+    // corner points tra frame consecutivi. Usa un filtro EMA per punto:
+    //   smoothed = alpha * nuovo + (1 - alpha) * precedente
+    //
+    // alpha vicino a 1 = più reattivo, meno smooth
+    // alpha vicino a 0 = più smooth, meno reattivo
+    // =========================================================================
+
+    var SMOOTH_ALPHA = 0.35; // Fattore di smoothing (0.3-0.5 è un buon range)
+    var smoothedPoints = null; // Corner points smorzati del frame precedente
+    var lastDetectTime = 0;    // Timestamp ultimo rilevamento
+    var SMOOTH_TIMEOUT = 200;  // Reset smooth se il QR sparisce per più di 200ms
+
+    /**
+     * Applica smoothing EMA ai corner points.
+     * Se i punti precedenti non esistono o sono troppo vecchi, usa i nuovi direttamente.
+     */
+    function smoothCornerPoints(newPoints) {
+        var now = performance.now();
+
+        // Se non ci sono punti precedenti o è passato troppo tempo, reset
+        if (!smoothedPoints || (now - lastDetectTime) > SMOOTH_TIMEOUT) {
+            smoothedPoints = newPoints.map(function (p) {
+                return { x: p.x, y: p.y };
+            });
+            lastDetectTime = now;
+            return smoothedPoints;
+        }
+
+        // EMA: smoothed = alpha * new + (1 - alpha) * old
+        for (var i = 0; i < 4; i++) {
+            smoothedPoints[i].x = SMOOTH_ALPHA * newPoints[i].x + (1 - SMOOTH_ALPHA) * smoothedPoints[i].x;
+            smoothedPoints[i].y = SMOOTH_ALPHA * newPoints[i].y + (1 - SMOOTH_ALPHA) * smoothedPoints[i].y;
+        }
+
+        lastDetectTime = now;
+        return smoothedPoints;
+    }
+
     // Inizializza BarcodeDetector
     async function initDetector() {
         if ('BarcodeDetector' in window) {
@@ -232,8 +274,11 @@
         ctx.clearRect(0, 0, overlay.width, overlay.height);
         if (!cornerPoints || cornerPoints.length < 4) return;
 
+        // Applica smoothing temporale per ridurre l'effetto "ballerino"
+        var points = smoothCornerPoints(cornerPoints);
+
         if (labelImage) {
-            drawWarpedImage(labelImage, cornerPoints);
+            drawWarpedImage(labelImage, points);
         } else {
             // Fallback debug: poligono + punti
             var scaleX = overlay.width / video.videoWidth;
@@ -244,18 +289,18 @@
             ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
 
             ctx.beginPath();
-            ctx.moveTo(cornerPoints[0].x * scaleX, cornerPoints[0].y * scaleY);
-            for (var i = 1; i < cornerPoints.length; i++) {
-                ctx.lineTo(cornerPoints[i].x * scaleX, cornerPoints[i].y * scaleY);
+            ctx.moveTo(points[0].x * scaleX, points[0].y * scaleY);
+            for (var i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x * scaleX, points[i].y * scaleY);
             }
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
 
             ctx.fillStyle = '#6ee7b7';
-            for (var j = 0; j < cornerPoints.length; j++) {
+            for (var j = 0; j < points.length; j++) {
                 ctx.beginPath();
-                ctx.arc(cornerPoints[j].x * scaleX, cornerPoints[j].y * scaleY, 6, 0, Math.PI * 2);
+                ctx.arc(points[j].x * scaleX, points[j].y * scaleY, 6, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -283,6 +328,7 @@
                 setStatus('QR rilevato', 'scanning');
             } else {
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
+                smoothedPoints = null; // Reset smoothing quando il QR sparisce
                 setStatus('Inquadra un QR code...', 'scanning');
             }
         } catch (err) {
