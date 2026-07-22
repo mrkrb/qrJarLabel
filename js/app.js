@@ -405,20 +405,29 @@
     async function init() {
         setStatus('Avvio...', '');
 
-        const hasDetector = await initDetector();
-        if (!hasDetector) {
-            setStatus('BarcodeDetector non supportato su questo browser', 'error');
-            return;
+        try {
+            const hasDetector = await initDetector();
+            if (!hasDetector) {
+                setStatus('BarcodeDetector non supportato su questo browser', 'error');
+                return;
+            }
+
+            setStatus('Caricamento dati...', '');
+
+            // Carica le immagini già salvate in IndexedDB
+            await loadAllImages();
+
+            setStatus('Avvio fotocamera...', '');
+
+            const cameraOk = await startCamera();
+            if (!cameraOk) return;
+
+            setStatus('Inquadra un QR code...', 'scanning');
+            detectLoop();
+        } catch (err) {
+            console.error('Errore init:', err);
+            setStatus('Errore: ' + err.message, 'error');
         }
-
-        // Carica le immagini già salvate in IndexedDB
-        await loadAllImages();
-
-        const cameraOk = await startCamera();
-        if (!cameraOk) return;
-
-        setStatus('Inquadra un QR code...', 'scanning');
-        detectLoop();
     }
 
     window.addEventListener('resize', function () {
