@@ -8,39 +8,31 @@
     const statusText = document.getElementById('status-text');
     const qrResult = document.getElementById('qr-result');
     const qrValue = document.getElementById('qr-value');
+    const btnUpload = document.getElementById('btn-upload');
+    const fileInput = document.getElementById('file-input');
 
     let detector = null;
     let animFrameId = null;
     let lastDetectedValue = '';
     let hideTimeout = null;
 
-    // Immagine di test per l'overlay (hardcoded per milestone 3)
-    let labelImage = null;
+    // Cache delle immagini caricate da IndexedDB: { qrId: HTMLImageElement }
+    var imageCache = {};
+
+    // QR attualmente rilevato (per l'associazione upload)
+    var currentQrId = null;
 
     // =========================================================================
-    // SMOOTHING TEMPORALE (EMA - Exponential Moving Average)
-    //
-    // Riduce il "ballare" dell'overlay smorzando le micro-oscillazioni dei
-    // corner points tra frame consecutivi. Usa un filtro EMA per punto:
-    //   smoothed = alpha * nuovo + (1 - alpha) * precedente
-    //
-    // alpha vicino a 1 = più reattivo, meno smooth
-    // alpha vicino a 0 = più smooth, meno reattivo
+    // SMOOTHING TEMPORALE (EMA)
     // =========================================================================
 
-    var SMOOTH_ALPHA = 0.35; // Fattore di smoothing (0.3-0.5 è un buon range)
-    var smoothedPoints = null; // Corner points smorzati del frame precedente
-    var lastDetectTime = 0;    // Timestamp ultimo rilevamento
-    var SMOOTH_TIMEOUT = 200;  // Reset smooth se il QR sparisce per più di 200ms
+    var SMOOTH_ALPHA = 0.35;
+    var smoothedPoints = null;
+    var lastDetectTime = 0;
+    var SMOOTH_TIMEOUT = 200;
 
-    /**
-     * Applica smoothing EMA ai corner points.
-     * Se i punti precedenti non esistono o sono troppo vecchi, usa i nuovi direttamente.
-     */
     function smoothCornerPoints(newPoints) {
         var now = performance.now();
-
-        // Se non ci sono punti precedenti o è passato troppo tempo, reset
         if (!smoothedPoints || (now - lastDetectTime) > SMOOTH_TIMEOUT) {
             smoothedPoints = newPoints.map(function (p) {
                 return { x: p.x, y: p.y };
@@ -48,18 +40,84 @@
             lastDetectTime = now;
             return smoothedPoints;
         }
-
-        // EMA: smoothed = alpha * new + (1 - alpha) * old
         for (var i = 0; i < 4; i++) {
             smoothedPoints[i].x = SMOOTH_ALPHA * newPoints[i].x + (1 - SMOOTH_ALPHA) * smoothedPoints[i].x;
             smoothedPoints[i].y = SMOOTH_ALPHA * newPoints[i].y + (1 - SMOOTH_ALPHA) * smoothedPoints[i].y;
         }
-
         lastDetectTime = now;
         return smoothedPoints;
     }
 
-    // Inizializza BarcodeDetector
+    // =========================================================================
+    // INDEXEDDB: CARICAMENTO E UPLOAD IMMAGINI
+    // =========================================================================
+
+    /**
+     * Carica un'immagine dal Blob in cache come HTMLImageElement.
+     */
+    function blobToImage(blob) {
+        return new Promise(function (resolve, reject) {
+            var url = URL.createObjectURL(blob);
+            var img = new Image();
+            img.onload = function () {
+                // Non revocare subito l'URL — serve per drawImage
+                resolve(img);
+            };
+            img.onerror = function () {
+                URL.revokeObjectURL(url);
+                reject(new Error('Impossibile caricare immagine dal blob'));
+            };
+            img.src = url;
+        });
+    }
+
+    /**
+     * Carica tutte le associazioni da IndexedDB nella cache immagini.
+     */
+    async function loadAllImages() {
+        try {
+            var associations = await JarDB.getAll();
+            for (var i = 0; i < associations.length; i++) {
+                var assoc = associations[i];
+                if (assoc.imageBlob) {
+                    imageCache[assoc.qrId] = await blobToImage(assoc.imageBlob);
+                }
+            }
+            console.log('Caricate', Object.keys(imageCache).length, 'immagini da IndexedDB');
+        } catch (err) {
+            console.warn('Errore caricamento immagini da DB:', err);
+        }
+    }
+
+    /**
+     * Restituisce l'immagine associata a un qrId dalla cache, o null.
+     */
+    function getImageForQr(qrId) {
+        return imageCache[qrId] || null;
+    }
+
+    /**
+     * Gestisce l'upload di un file immagine: lo salva in IndexedDB
+     * associato al QR corrente e lo mette in cache.
+     */
+    async function handleFileUpload(file) {
+        if (!currentQrId) return;
+
+        try {
+            await JarDB.save(currentQrId, file);
+            imageCache[currentQrId] = await blobToImage(file);
+            setStatus('Immagine salvata per: ' + currentQrId, 'scanning');
+            console.log('Salvata associazione:', currentQrId);
+        } catch (err) {
+            console.error('Errore salvataggio:', err);
+            setStatus('Errore salvataggio immagine', 'error');
+        }
+    }
+
+    // =========================================================================
+    // DETECTOR E FOTOCAMERA
+    // =========================================================================
+
     async function initDetector() {
         if ('BarcodeDetector' in window) {
             const formats = await BarcodeDetector.getSupportedFormats();
@@ -71,25 +129,6 @@
         return false;
     }
 
-    // Carica l'immagine di test
-    function loadTestLabel() {
-        return new Promise(function (resolve) {
-            var img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = function () {
-                labelImage = img;
-                console.log('Label caricata:', img.naturalWidth, 'x', img.naturalHeight);
-                resolve();
-            };
-            img.onerror = function (e) {
-                console.warn('Errore caricamento label:', e);
-                resolve();
-            };
-            img.src = './assets/test-label.png';
-        });
-    }
-
-    // Avvia la fotocamera posteriore
     async function startCamera() {
         const constraints = {
             video: {
@@ -120,33 +159,32 @@
     function showQrResult(value) {
         qrValue.textContent = value;
         qrResult.classList.remove('hidden');
+        currentQrId = value;
         lastDetectedValue = value;
+
+        // Mostra il pulsante upload solo se non c'è già un'immagine associata
+        if (!imageCache[value]) {
+            btnUpload.classList.remove('hidden');
+        } else {
+            btnUpload.classList.add('hidden');
+        }
 
         clearTimeout(hideTimeout);
         hideTimeout = setTimeout(function () {
             if (lastDetectedValue === value) {
                 qrResult.classList.add('hidden');
                 lastDetectedValue = '';
+                btnUpload.classList.add('hidden');
             }
         }, 3000);
     }
 
     // =========================================================================
     // TRASFORMAZIONE PROSPETTICA
-    //
-    // Approccio: suddividiamo il quadrilatero sorgente (l'immagine) e il
-    // quadrilatero destinazione (i 4 corner points) in una griglia NxN.
-    // Per ogni cella, calcoliamo la posizione di destinazione con interpolazione
-    // bilineare, poi disegniamo la porzione di immagine usando drawImage con
-    // una trasformazione affine (setTransform) e clipping a triangolo.
     // =========================================================================
 
     var SUBDIVISIONS = 8;
 
-    /**
-     * Interpola bilinearmente un punto (u, v) in [0,1]x[0,1]
-     * sui 4 corner points di destinazione [TL, TR, BR, BL].
-     */
     function bilerp(u, v, c) {
         return {
             x: (1-u)*(1-v)*c[0].x + u*(1-v)*c[1].x + u*v*c[2].x + (1-u)*v*c[3].x,
@@ -154,32 +192,14 @@
         };
     }
 
-    /**
-     * Disegna una porzione triangolare dell'immagine mappata su un triangolo
-     * di destinazione. Usa la tecnica standard texture-mapping con Canvas 2D:
-     * 
-     * 1. Definire il clip path sul triangolo di destinazione
-     * 2. Calcolare la matrice affine che mappa i 3 vertici sorgente ai 3 di dest
-     * 3. Applicare setTransform e drawImage
-     */
     function textureTriangle(img, imgW, imgH, s0, s1, s2, d0, d1, d2) {
-        // Matrice sorgente (coordinate nell'immagine)
         var sx0 = s0.x, sy0 = s0.y;
         var sx1 = s1.x, sy1 = s1.y;
         var sx2 = s2.x, sy2 = s2.y;
 
-        // Matrice destinazione (coordinate sul canvas)
         var dx0 = d0.x, dy0 = d0.y;
         var dx1 = d1.x, dy1 = d1.y;
         var dx2 = d2.x, dy2 = d2.y;
-
-        // Risolviamo per la matrice affine M tale che:
-        // M * [sx0, sy0, 1]^T = [dx0, dy0]^T
-        // M * [sx1, sy1, 1]^T = [dx1, dy1]^T
-        // M * [sx2, sy2, 1]^T = [dx2, dy2]^T
-        //
-        // M = | m11  m12  m13 |
-        //     | m21  m22  m23 |
 
         var denom = (sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1));
         if (Math.abs(denom) < 0.001) return;
@@ -195,34 +215,18 @@
         var m23 = (dy0 * (sx1*sy2 - sx2*sy1) + dy1 * (sx2*sy0 - sx0*sy2) + dy2 * (sx0*sy1 - sx1*sy0)) * invDenom;
 
         ctx.save();
-
-        // Reset transform per il clip path (deve essere in coordinate canvas)
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-        // Clip al triangolo di destinazione
         ctx.beginPath();
         ctx.moveTo(dx0, dy0);
         ctx.lineTo(dx1, dy1);
         ctx.lineTo(dx2, dy2);
         ctx.closePath();
         ctx.clip();
-
-        // setTransform(a, b, c, d, e, f) imposta la matrice:
-        // | a  c  e |
-        // | b  d  f |
-        // | 0  0  1 |
-        // Dove (a,b) è la colonna per x, (c,d) per y, (e,f) per traslazione
         ctx.setTransform(m11, m21, m12, m22, m13, m23);
-
-        // Disegna l'immagine intera — il clip limita l'output al triangolo
         ctx.drawImage(img, 0, 0, imgW, imgH, 0, 0, imgW, imgH);
-
         ctx.restore();
     }
 
-    /**
-     * Disegna l'immagine warpata prospetticamente sui 4 corner points.
-     */
     function drawWarpedImage(img, cornerPoints) {
         if (!img || !cornerPoints || cornerPoints.length < 4) return;
 
@@ -230,7 +234,6 @@
         var imgH = img.naturalHeight || img.height;
         var n = SUBDIVISIONS;
 
-        // Scala i corner points dal sistema video al canvas
         var scaleX = overlay.width / video.videoWidth;
         var scaleY = overlay.height / video.videoHeight;
 
@@ -248,39 +251,39 @@
                 var u2 = (col+1) / n,   v2 = (row+1) / n;
                 var u3 = col / n,       v3 = (row+1) / n;
 
-                // Punti sorgente nell'immagine
                 var s0 = { x: u0 * imgW, y: v0 * imgH };
                 var s1 = { x: u1 * imgW, y: v1 * imgH };
                 var s2 = { x: u2 * imgW, y: v2 * imgH };
                 var s3 = { x: u3 * imgW, y: v3 * imgH };
 
-                // Punti destinazione (interpolazione bilineare)
                 var d0 = bilerp(u0, v0, corners);
                 var d1 = bilerp(u1, v1, corners);
                 var d2 = bilerp(u2, v2, corners);
                 var d3 = bilerp(u3, v3, corners);
 
-                // Ogni cella = 2 triangoli
                 textureTriangle(img, imgW, imgH, s0, s1, s2, d0, d1, d2);
                 textureTriangle(img, imgW, imgH, s0, s2, s3, d0, d2, d3);
             }
         }
     }
 
-    /**
-     * Disegna l'overlay sul QR rilevato.
-     */
-    function drawOverlay(cornerPoints) {
+    // =========================================================================
+    // OVERLAY
+    // =========================================================================
+
+    function drawOverlay(qrId, cornerPoints) {
         ctx.clearRect(0, 0, overlay.width, overlay.height);
         if (!cornerPoints || cornerPoints.length < 4) return;
 
-        // Applica smoothing temporale per ridurre l'effetto "ballerino"
         var points = smoothCornerPoints(cornerPoints);
 
-        if (labelImage) {
-            drawWarpedImage(labelImage, points);
+        // Cerca immagine associata a questo QR in IndexedDB (cache)
+        var img = getImageForQr(qrId);
+
+        if (img) {
+            drawWarpedImage(img, points);
         } else {
-            // Fallback debug: poligono + punti
+            // Fallback: poligono debug
             var scaleX = overlay.width / video.videoWidth;
             var scaleY = overlay.height / video.videoHeight;
 
@@ -306,7 +309,10 @@
         }
     }
 
-    // Loop di rilevamento
+    // =========================================================================
+    // LOOP DI RILEVAMENTO
+    // =========================================================================
+
     async function detectLoop() {
         if (!detector || video.readyState < 2) {
             animFrameId = requestAnimationFrame(detectLoop);
@@ -324,11 +330,11 @@
             if (barcodes.length > 0) {
                 const qr = barcodes[0];
                 showQrResult(qr.rawValue);
-                drawOverlay(qr.cornerPoints);
+                drawOverlay(qr.rawValue, qr.cornerPoints);
                 setStatus('QR rilevato', 'scanning');
             } else {
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
-                smoothedPoints = null; // Reset smoothing quando il QR sparisce
+                smoothedPoints = null;
                 setStatus('Inquadra un QR code...', 'scanning');
             }
         } catch (err) {
@@ -338,7 +344,29 @@
         animFrameId = requestAnimationFrame(detectLoop);
     }
 
-    // Inizializzazione
+    // =========================================================================
+    // EVENT HANDLERS
+    // =========================================================================
+
+    // Pulsante upload: apre il file picker
+    btnUpload.addEventListener('click', function (e) {
+        e.stopPropagation();
+        fileInput.click();
+    });
+
+    // File selezionato: salva in IndexedDB
+    fileInput.addEventListener('change', function () {
+        var file = fileInput.files[0];
+        if (file) {
+            handleFileUpload(file);
+            fileInput.value = ''; // Reset per permettere ri-selezione stesso file
+        }
+    });
+
+    // =========================================================================
+    // INIZIALIZZAZIONE
+    // =========================================================================
+
     async function init() {
         setStatus('Avvio...', '');
 
@@ -348,7 +376,8 @@
             return;
         }
 
-        await loadTestLabel();
+        // Carica le immagini già salvate in IndexedDB
+        await loadAllImages();
 
         const cameraOk = await startCamera();
         if (!cameraOk) return;
