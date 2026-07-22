@@ -179,7 +179,7 @@
 
         clearTimeout(hideTimeout);
         hideTimeout = setTimeout(function () {
-            if (lastDetectedValue === value) {
+            if (lastDetectedValue === value && !sliderActive) {
                 qrResult.classList.add('hidden');
                 lastDetectedValue = '';
                 btnUpload.classList.add('hidden');
@@ -416,9 +416,25 @@
     });
 
     // Slider scala: aggiorna il valore in tempo reale
-    scaleSlider.addEventListener('input', function () {
+    var sliderActive = false;
+
+    function onScaleChange() {
         imageScale = parseFloat(scaleSlider.value);
         scaleValueLabel.textContent = imageScale.toFixed(1) + 'x';
+    }
+    scaleSlider.addEventListener('input', onScaleChange);
+    scaleSlider.addEventListener('change', onScaleChange);
+
+    // Impedisci che il tocco sullo slider propaghi e causi problemi
+    scaleControl.addEventListener('touchstart', function (e) {
+        e.stopPropagation();
+        sliderActive = true;
+    });
+    scaleControl.addEventListener('touchmove', function (e) {
+        e.stopPropagation();
+    });
+    scaleControl.addEventListener('touchend', function () {
+        sliderActive = false;
     });
 
     // =========================================================================
