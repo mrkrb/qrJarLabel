@@ -119,8 +119,10 @@
 
         if (!cornerPoints || cornerPoints.length < 4) return;
 
-        // Stabilizza il quarto vertice (bottom-right, senza finder pattern)
-        var stablePoints = stabilizeCornerPoints(cornerPoints);
+        // Usa i corner points originali del detector (la stabilizzazione
+        // del quarto vertice via parallelogramma verrà applicata solo
+        // all'overlay immagine finale, non al debug visuale)
+        var points = cornerPoints;
 
         // Calcola il fattore di scala tra video reale e canvas
         const scaleX = overlay.width / video.videoWidth;
@@ -132,9 +134,9 @@
 
         // Disegna il poligono
         ctx.beginPath();
-        ctx.moveTo(stablePoints[0].x * scaleX, stablePoints[0].y * scaleY);
-        for (let i = 1; i < stablePoints.length; i++) {
-            ctx.lineTo(stablePoints[i].x * scaleX, stablePoints[i].y * scaleY);
+        ctx.moveTo(points[0].x * scaleX, points[0].y * scaleY);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x * scaleX, points[i].y * scaleY);
         }
         ctx.closePath();
         ctx.fill();
@@ -142,7 +144,7 @@
 
         // Disegna i punti agli angoli
         ctx.fillStyle = '#6ee7b7';
-        for (const point of stablePoints) {
+        for (const point of points) {
             ctx.beginPath();
             ctx.arc(point.x * scaleX, point.y * scaleY, 6, 0, Math.PI * 2);
             ctx.fill();
