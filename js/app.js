@@ -455,23 +455,41 @@
         return true;
     }
 
-    overlay.addEventListener('click', function (e) {
+    // Tocco sull'overlay: rileva tap (non scroll) e apre la galleria
+    var touchStartTime = 0;
+    var touchStartPos = null;
+
+    overlay.addEventListener('touchstart', function (e) {
         if (touchableAreas.length === 0) return;
+        touchStartTime = Date.now();
+        touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }, { passive: true });
 
-        // Coordinate del tocco relative al canvas renderizzato
+    overlay.addEventListener('touchend', function (e) {
+        if (touchableAreas.length === 0 || !touchStartPos) return;
+
+        // Accetta come tap solo se il tocco è durato meno di 300ms
+        // e il dito non si è spostato più di 15px
+        var elapsed = Date.now() - touchStartTime;
+        var touch = e.changedTouches[0];
+        var dx = touch.clientX - touchStartPos.x;
+        var dy = touch.clientY - touchStartPos.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+
+        touchStartPos = null;
+        if (elapsed > 300 || dist > 15) return;
+
+        // Coordinate del tap
         var rect = overlay.getBoundingClientRect();
-        var cssX = e.clientX - rect.left;
-        var cssY = e.clientY - rect.top;
+        var cssX = touch.clientX - rect.left;
+        var cssY = touch.clientY - rect.top;
 
-        // Converti da coordinate CSS a coordinate interne del canvas
-        // (il canvas ha object-fit: cover, stessa logica del video)
         var canvasX = cssX * (overlay.width / rect.width);
         var canvasY = cssY * (overlay.height / rect.height);
 
         for (var i = 0; i < touchableAreas.length; i++) {
             var area = touchableAreas[i];
             if (isPointInQuad(canvasX, canvasY, area.points)) {
-                // Apri galleria per questo QR
                 window.location.href = 'gallery.html?qr=' + encodeURIComponent(area.qrId);
                 return;
             }
