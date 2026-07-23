@@ -35,7 +35,6 @@
     var fsPanX = 0;
     var fsPanY = 0;
     var fsLastDist = 0;
-    var fsLastCenter = null;
     var fsPanning = false;
     var fsPanStart = null;
 
@@ -68,28 +67,28 @@
         hideFullscreen();
     });
 
-    // Tap su sfondo chiude (solo se non stava zoomando/pannando)
-    var fsTapTime = 0;
+    // Tap su sfondo chiude (solo se non zoomato e non appena usciti da pinch)
     modalFullscreen.addEventListener('click', function (e) {
+        if (wasPinching) return;
         if (e.target === modalFullscreen && fsScale <= 1.05) {
             hideFullscreen();
         }
     });
 
     // Pinch-to-zoom + pan
+    var wasPinching = false;
+
     modalFullscreen.addEventListener('touchstart', function (e) {
         if (e.touches.length === 2) {
             // Inizio pinch
+            wasPinching = true;
             var dx = e.touches[1].clientX - e.touches[0].clientX;
             var dy = e.touches[1].clientY - e.touches[0].clientY;
             fsLastDist = Math.sqrt(dx * dx + dy * dy);
-            fsLastCenter = {
-                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-            };
             fsPanning = false;
-        } else if (e.touches.length === 1 && fsScale > 1.05) {
-            // Inizio pan (solo se zoomato)
+            fsPanStart = null;
+        } else if (e.touches.length === 1 && fsScale > 1.05 && !wasPinching) {
+            // Inizio pan (solo se zoomato e non appena usciti da un pinch)
             fsPanning = true;
             fsPanStart = { x: e.touches[0].clientX - fsPanX, y: e.touches[0].clientY - fsPanY };
         }
@@ -119,36 +118,33 @@
     modalFullscreen.addEventListener('touchend', function (e) {
         if (e.touches.length < 2) {
             fsLastDist = 0;
-            fsLastCenter = null;
         }
         if (e.touches.length === 0) {
             fsPanning = false;
             fsPanStart = null;
-            // Se scala torna a ~1, resetta pan
-            if (fsScale <= 1.05) {
-                fsScale = 1;
-                fsPanX = 0;
-                fsPanY = 0;
-                applyFsTransform();
-            }
+            // Reset wasPinching dopo un breve delay (permette il prossimo
+            // touchstart singolo di iniziare il pan)
+            setTimeout(function () { wasPinching = false; }, 100);
         }
     }, { passive: true });
 
-    // Double-tap per reset zoom
+    // Double-tap per toggle zoom (non scatta se appena usciti da un pinch)
     var lastTapTime = 0;
-    fullscreenImage.addEventListener('touchend', function (e) {
+    fullscreenImage.addEventListener('click', function () {
+        if (wasPinching) return;
         var now = Date.now();
         if (now - lastTapTime < 300) {
-            // Double tap
+            // Double tap: toggle zoom
             if (fsScale > 1.05) {
                 resetFsTransform();
-                applyFsTransform();
             } else {
                 fsScale = 2.5;
                 applyFsTransform();
             }
+            lastTapTime = 0;
+        } else {
+            lastTapTime = now;
         }
-        lastTapTime = now;
     });
 
     // =========================================================================
