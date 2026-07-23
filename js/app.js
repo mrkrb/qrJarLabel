@@ -421,7 +421,22 @@
     // INIZIALIZZAZIONE
     // =========================================================================
 
+    var initRunning = false;
+
     async function init() {
+        if (initRunning) return;
+        initRunning = true;
+
+        // Ferma eventuale loop precedente
+        if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+        }
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(function (t) { t.stop(); });
+            video.srcObject = null;
+        }
+
         setStatus('Avvio...', '');
         try {
             const hasDetector = await initDetector();
@@ -442,6 +457,8 @@
         } catch (err) {
             console.error('Errore init:', err);
             setStatus('Errore: ' + err.message, 'error');
+        } finally {
+            initRunning = false;
         }
     }
 
