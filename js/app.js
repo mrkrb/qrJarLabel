@@ -542,5 +542,31 @@
         }
     });
 
+    // Rilascia la camera quando l'utente naviga via (permette alla config
+    // di usarla) e ri-inizializza quando torna (bfcache / pageshow)
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            // Pagina nascosta: ferma camera e detection
+            if (animFrameId) {
+                cancelAnimationFrame(animFrameId);
+                animFrameId = null;
+            }
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(function (t) { t.stop(); });
+                video.srcObject = null;
+            }
+        } else {
+            // Pagina visibile: riavvia
+            init();
+        }
+    });
+
+    window.addEventListener('pageshow', function (event) {
+        // Se la pagina viene da bfcache, ri-inizializza
+        if (event.persisted) {
+            init();
+        }
+    });
+
     init();
 })();

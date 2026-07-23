@@ -130,10 +130,10 @@
 
     async function openScanModal() {
         modalScan.classList.remove('hidden');
-        scanStatus.textContent = 'Inquadra un QR code...';
+        scanStatus.textContent = 'Avvio fotocamera...';
 
         // Piccolo delay per assicurare che il modale sia renderizzato
-        await new Promise(function (r) { setTimeout(r, 100); });
+        await new Promise(function (r) { setTimeout(r, 200); });
 
         try {
             // Inizializza detector
@@ -141,20 +141,42 @@
                 scanDetector = new BarcodeDetector({ formats: ['qr_code'] });
             }
 
-            // Avvia fotocamera
-            scanStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-                audio: false
-            });
+            // Avvia fotocamera (con retry)
+            var attempts = 0;
+            while (attempts < 3) {
+                try {
+                    scanStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                        audio: false
+                    });
+                    break;
+                } catch (camErr) {
+                    attempts++;
+                    if (attempts >= 3) throw camErr;
+                    await new Promise(function (r) { setTimeout(r, 500); });
+                }
+            }
+
             scanVideo.srcObject = scanStream;
+            scanVideo.setAttribute('playsinline', '');
+            scanVideo.setAttribute('autoplay', '');
+            scanVideo.muted = true;
 
-            // Forza play dopo assegnazione srcObject
-            await scanVideo.play();
+            // Attendi che il video sia pronto
+            await new Promise(function (resolve, reject) {
+                scanVideo.onloadedmetadata = function () {
+                    scanVideo.play().then(resolve).catch(reject);
+                };
+                // Timeout fallback
+                setTimeout(function () {
+                    scanVideo.play().then(resolve).catch(reject);
+                }, 1000);
+            });
 
-            // Avvia detection loop
+            scanStatus.textContent = 'Inquadra un QR code...';
             scanLoop();
         } catch (err) {
-            scanStatus.textContent = 'Errore fotocamera: ' + err.message;
+            scanStatus.textContent = 'Errore: ' + err.message;
             console.error('Errore scan camera:', err);
         }
     }
