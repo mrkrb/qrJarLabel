@@ -168,7 +168,7 @@
                 }, 1000);
             });
 
-            scanStatus.textContent = 'Inquadra un QR code...';
+            scanStatus.textContent = 'Inquadra un QR code nel riquadro...';
             scanLoop();
         } catch (err) {
             scanStatus.textContent = 'Errore: ' + err.message;
@@ -194,6 +194,30 @@
         scanVideo.srcObject = null;
     }
 
+    /**
+     * Verifica che tutti i corner points del QR siano dentro il rettangolo
+     * verde (zona centrale 60% del video, cioè da 20% a 80% su ogni asse).
+     */
+    function isQrInsideTarget(cornerPoints) {
+        if (!cornerPoints || cornerPoints.length < 4) return false;
+        var vw = scanVideo.videoWidth;
+        var vh = scanVideo.videoHeight;
+        if (!vw || !vh) return false;
+
+        var minX = vw * 0.20;
+        var maxX = vw * 0.80;
+        var minY = vh * 0.20;
+        var maxY = vh * 0.80;
+
+        for (var i = 0; i < cornerPoints.length; i++) {
+            var p = cornerPoints[i];
+            if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     function scanLoop() {
         if (!scanDetector || scanVideo.readyState < 2) {
             scanAnimFrame = requestAnimationFrame(scanLoop);
@@ -201,22 +225,27 @@
         }
 
         scanDetector.detect(scanVideo).then(function (barcodes) {
-            if (barcodes.length > 0) {
-                var qrId = barcodes[0].rawValue;
+            // Filtra: accetta solo QR con tutti i corner points dentro il rettangolo
+            var validQr = null;
+            for (var i = 0; i < barcodes.length; i++) {
+                if (isQrInsideTarget(barcodes[i].cornerPoints)) {
+                    validQr = barcodes[i];
+                    break;
+                }
+            }
 
-                // Mostra il QR rilevato e abilita il pulsante conferma
-                scannedQrId = qrId;
-                scanDetectedValue.textContent = qrId;
+            if (validQr) {
+                scannedQrId = validQr.rawValue;
+                scanDetectedValue.textContent = validQr.rawValue;
                 scanDetected.classList.remove('hidden');
                 btnScanConfirm.classList.remove('hidden');
                 scanStatus.textContent = 'QR rilevato!';
             } else {
-                // Nessun QR visibile: resetta
                 if (scannedQrId) {
                     scannedQrId = null;
                     scanDetected.classList.add('hidden');
                     btnScanConfirm.classList.add('hidden');
-                    scanStatus.textContent = 'Inquadra un QR code...';
+                    scanStatus.textContent = 'Inquadra un QR code nel riquadro...';
                 }
             }
 
