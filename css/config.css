@@ -344,3 +344,33 @@ html, body {
 .btn-danger:active {
     background: #b91c1c;
 }
+
+/* Backup actions */
+#backup-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-backup {
+    flex: 1;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    color: #e0e0e0;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.btn-backup:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-backup:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}

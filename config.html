@@ -24,6 +24,11 @@
                 <p>Premi <strong>+</strong> per aggiungerne una.</p>
             </div>
             <ul id="associations-list"></ul>
+            <div id="backup-actions">
+                <button id="btn-export" class="btn-backup">&#8595; Esporta backup</button>
+                <button id="btn-import" class="btn-backup">&#8593; Importa backup</button>
+                <input type="file" id="import-file-input" accept=".zip" style="display:none">
+            </div>
         </div>
 
         <!-- Modale: scansione QR per nuova associazione -->
@@ -74,6 +79,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="js/db.js"></script>
     <script src="js/config.js"></script>
 </body>

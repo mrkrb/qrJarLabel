@@ -388,6 +388,119 @@
     }
 
     // =========================================================================
+    // EXPORT / IMPORT BACKUP (ZIP)
+    // =========================================================================
+
+    var btnExport = document.getElementById('btn-export');
+    var btnImport = document.getElementById('btn-import');
+    var importFileInput = document.getElementById('import-file-input');
+
+    /**
+     * Esporta tutte le associazioni come file ZIP:
+     * - manifest.json: array di { qrId, filename, createdAt }
+     * - images/: cartella con le immagini (nominate come qrId sanitizzato)
+     */
+    async function exportBackup() {
+        btnExport.disabled = true;
+        btnExport.textContent = 'Esportazione...';
+
+        try {
+            var associations = await JarDB.getAll();
+            if (associations.length === 0) {
+                alert('Nessuna associazione da esportare.');
+                return;
+            }
+
+            var zip = new JSZip();
+            var manifest = [];
+
+            for (var i = 0; i < associations.length; i++) {
+                var assoc = associations[i];
+                // Sanitizza il nome file (rimuovi caratteri non validi)
+                var safeName = assoc.qrId.replace(/[^a-zA-Z0-9_\-:.]/g, '_');
+                var ext = 'jpg';
+                if (assoc.imageBlob && assoc.imageBlob.type === 'image/png') {
+                    ext = 'png';
+                }
+                var filename = 'images/' + safeName + '.' + ext;
+
+                manifest.push({
+                    qrId: assoc.qrId,
+                    filename: filename,
+                    createdAt: assoc.createdAt || null
+                });
+
+                if (assoc.imageBlob) {
+                    zip.file(filename, assoc.imageBlob);
+                }
+            }
+
+            zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+
+            var blob = await zip.generateAsync({ type: 'blob' });
+
+            // Scarica il file
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'qr-jar-label-backup.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Errore export:', err);
+            alert('Errore durante l\'esportazione: ' + err.message);
+        } finally {
+            btnExport.disabled = false;
+            btnExport.innerHTML = '&#8595; Esporta backup';
+        }
+    }
+
+    /**
+     * Importa associazioni da un file ZIP.
+     * Sovrascrive associazioni con lo stesso qrId.
+     */
+    async function importBackup(file) {
+        btnImport.disabled = true;
+        btnImport.textContent = 'Importazione...';
+
+        try {
+            var zip = await JSZip.loadAsync(file);
+
+            // Leggi manifest
+            var manifestFile = zip.file('manifest.json');
+            if (!manifestFile) {
+                alert('File ZIP non valido: manca manifest.json');
+                return;
+            }
+
+            var manifestText = await manifestFile.async('string');
+            var manifest = JSON.parse(manifestText);
+
+            var imported = 0;
+            for (var i = 0; i < manifest.length; i++) {
+                var entry = manifest[i];
+                var imgFile = zip.file(entry.filename);
+                if (imgFile) {
+                    var imgBlob = await imgFile.async('blob');
+                    await JarDB.save(entry.qrId, imgBlob);
+                    imported++;
+                }
+            }
+
+            alert('Importate ' + imported + ' associazioni.');
+            await loadList();
+        } catch (err) {
+            console.error('Errore import:', err);
+            alert('Errore durante l\'importazione: ' + err.message);
+        } finally {
+            btnImport.disabled = false;
+            btnImport.innerHTML = '&#8593; Importa backup';
+        }
+    }
+
+    // =========================================================================
     // EVENT LISTENERS
     // =========================================================================
 
@@ -405,6 +518,18 @@
 
     btnDeleteConfirm.addEventListener('click', confirmDelete);
     btnDeleteCancel.addEventListener('click', closeDeleteModal);
+
+    btnExport.addEventListener('click', exportBackup);
+    btnImport.addEventListener('click', function () {
+        importFileInput.click();
+    });
+    importFileInput.addEventListener('change', function () {
+        var file = importFileInput.files[0];
+        if (file) {
+            importBackup(file);
+            importFileInput.value = '';
+        }
+    });
 
     // =========================================================================
     // INIT
