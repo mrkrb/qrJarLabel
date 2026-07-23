@@ -352,6 +352,12 @@
     // LOOP DI RILEVAMENTO
     // =========================================================================
 
+    // Debounce: mantieni l'overlay visibile per un breve periodo dopo che
+    // il QR sparisce dalla detection, per evitare flickering.
+    var DEBOUNCE_MS = 150;
+    // { qrId: { cornerPoints, lastSeen: timestamp } }
+    var lastSeenState = {};
+
     async function detectLoop() {
         if (!detector || video.readyState < 2) {
             animFrameId = requestAnimationFrame(detectLoop);
@@ -365,19 +371,40 @@
 
         try {
             const barcodes = await detector.detect(video);
+            var now = performance.now();
 
-            if (barcodes.length > 0) {
-                // Pulisci canvas una volta, poi disegna tutti gli overlay
+            // Aggiorna lastSeenState con i QR rilevati in questo frame
+            for (var i = 0; i < barcodes.length; i++) {
+                lastSeenState[barcodes[i].rawValue] = {
+                    cornerPoints: barcodes[i].cornerPoints,
+                    lastSeen: now
+                };
+            }
+
+            // Costruisci la lista di QR da visualizzare:
+            // tutti quelli visti in questo frame + quelli nel debounce window
+            var visibleQrs = [];
+            var keys = Object.keys(lastSeenState);
+            for (var k = 0; k < keys.length; k++) {
+                var state = lastSeenState[keys[k]];
+                if ((now - state.lastSeen) < DEBOUNCE_MS) {
+                    visibleQrs.push({ rawValue: keys[k], cornerPoints: state.cornerPoints });
+                } else {
+                    // Troppo vecchio, rimuovi
+                    delete lastSeenState[keys[k]];
+                }
+            }
+
+            if (visibleQrs.length > 0) {
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
 
                 var activeIds = [];
                 var newTouchable = [];
-                for (var i = 0; i < barcodes.length; i++) {
-                    var qr = barcodes[i];
+                for (var j = 0; j < visibleQrs.length; j++) {
+                    var qr = visibleQrs[j];
                     activeIds.push(qr.rawValue);
                     drawSingleOverlay(qr.rawValue, qr.cornerPoints);
 
-                    // Tutti i QR sono toccabili (aprono la galleria)
                     var scX = overlay.width / video.videoWidth;
                     var scY = overlay.height / video.videoHeight;
                     newTouchable.push({
@@ -388,17 +415,16 @@
                     });
                 }
                 touchableAreas = newTouchable;
-
-                // Pulisci smoothing per QR non più visibili
                 cleanupSmoothState(activeIds);
+                updateUI(visibleQrs);
 
-                updateUI(barcodes);
-                var statusMsg = barcodes.length === 1
-                    ? 'QR: ' + barcodes[0].rawValue
-                    : barcodes.length + ' QR rilevati';
+                var statusMsg = visibleQrs.length === 1
+                    ? 'QR: ' + visibleQrs[0].rawValue
+                    : visibleQrs.length + ' QR rilevati';
                 setStatus(statusMsg, 'scanning');
             } else {
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
+                touchableAreas = [];
                 cleanupSmoothState([]);
                 setStatus('Inquadra un QR code...', 'scanning');
             }

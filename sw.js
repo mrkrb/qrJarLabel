@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qr-jar-label-v31';
+const CACHE_NAME = 'qr-jar-label-v32';
 const ASSETS = [
     './',
     './index.html',
