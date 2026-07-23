@@ -6,27 +6,18 @@
     const ctx = overlay.getContext('2d');
     const statusBar = document.getElementById('status-bar');
     const statusText = document.getElementById('status-text');
-    const qrResult = document.getElementById('qr-result');
-    const qrValue = document.getElementById('qr-value');
-    const btnUpload = document.getElementById('btn-upload');
-    const fileInput = document.getElementById('file-input');
     const scaleControl = document.getElementById('scale-control');
     const scaleSlider = document.getElementById('scale-slider');
     const scaleValueLabel = document.getElementById('scale-value');
 
     let detector = null;
     let animFrameId = null;
-    let lastDetectedValue = '';
-    let hideTimeout = null;
 
     // Scala immagine overlay (controllata dallo slider)
     var imageScale = 1.0;
 
     // Cache delle immagini caricate da IndexedDB: { qrId: HTMLImageElement }
     var imageCache = {};
-
-    // QR attualmente rilevato (per l'associazione upload)
-    var currentQrId = null;
 
     // =========================================================================
     // SMOOTHING TEMPORALE (EMA) — PER-QR
@@ -109,71 +100,6 @@
         return imageCache[qrId] || null;
     }
 
-    /**
-     * Ridimensiona un'immagine mantenendo l'aspect ratio.
-     * Max 1024px per il lato più lungo, compressione JPEG 0.85.
-     * Restituisce un Blob pronto per IndexedDB.
-     */
-    function resizeImage(file, maxSize) {
-        maxSize = maxSize || 1024;
-        return new Promise(function (resolve, reject) {
-            var url = URL.createObjectURL(file);
-            var img = new Image();
-            img.onload = function () {
-                var w = img.naturalWidth;
-                var h = img.naturalHeight;
-
-                // Ridimensiona solo se necessario
-                if (w > maxSize || h > maxSize) {
-                    if (w >= h) {
-                        h = Math.round(h * (maxSize / w));
-                        w = maxSize;
-                    } else {
-                        w = Math.round(w * (maxSize / h));
-                        h = maxSize;
-                    }
-                }
-
-                // Disegna su un canvas temporaneo
-                var canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                var c = canvas.getContext('2d');
-                c.drawImage(img, 0, 0, w, h);
-
-                URL.revokeObjectURL(url);
-
-                // Converti in Blob JPEG
-                canvas.toBlob(function (blob) {
-                    if (blob) {
-                        resolve(blob);
-                    } else {
-                        reject(new Error('Errore conversione immagine'));
-                    }
-                }, 'image/jpeg', 0.85);
-            };
-            img.onerror = function () {
-                URL.revokeObjectURL(url);
-                reject(new Error('Errore caricamento immagine per resize'));
-            };
-            img.src = url;
-        });
-    }
-
-    async function handleFileUpload(file) {
-        if (!currentQrId) return;
-        try {
-            setStatus('Compressione immagine...', '');
-            var resized = await resizeImage(file, 1024);
-            await JarDB.save(currentQrId, resized);
-            imageCache[currentQrId] = await blobToImage(resized);
-            setStatus('Immagine salvata per: ' + currentQrId, 'scanning');
-        } catch (err) {
-            console.error('Errore salvataggio:', err);
-            setStatus('Errore salvataggio immagine', 'error');
-        }
-    }
-
     // =========================================================================
     // DETECTOR E FOTOCAMERA
     // =========================================================================
@@ -215,48 +141,27 @@
         statusBar.className = type || '';
     }
 
-    function showQrResult(barcodes) {
-        if (barcodes.length === 0) return;
-
-        // Trova il primo QR senza immagine associata (priorità per upload)
-        var targetForUpload = null;
+    /**
+     * Mostra/nasconde lo scale control in base ai QR rilevati.
+     */
+    function updateUI(barcodes) {
+        if (barcodes.length === 0) {
+            scaleControl.classList.add('hidden');
+            return;
+        }
+        // Mostra scale control se almeno un QR ha un'immagine associata
+        var hasImage = false;
         for (var i = 0; i < barcodes.length; i++) {
-            if (!imageCache[barcodes[i].rawValue]) {
-                targetForUpload = barcodes[i];
+            if (imageCache[barcodes[i].rawValue]) {
+                hasImage = true;
                 break;
             }
         }
-
-        // Label: mostra il QR target per upload, o il primo se tutti hanno immagine
-        var displayQr = targetForUpload || barcodes[0];
-        var label = displayQr.rawValue;
-        if (barcodes.length > 1) {
-            label += ' (+' + (barcodes.length - 1) + ')';
-        }
-
-        qrValue.textContent = label;
-        qrResult.classList.remove('hidden');
-        currentQrId = displayQr.rawValue;
-        lastDetectedValue = displayQr.rawValue;
-
-        // Mostra upload se c'è un QR senza immagine
-        if (targetForUpload) {
-            btnUpload.classList.remove('hidden');
-            scaleControl.classList.add('hidden');
-        } else {
-            btnUpload.classList.add('hidden');
+        if (hasImage) {
             scaleControl.classList.remove('hidden');
+        } else {
+            scaleControl.classList.add('hidden');
         }
-
-        clearTimeout(hideTimeout);
-        hideTimeout = setTimeout(function () {
-            if (lastDetectedValue === displayQr.rawValue && !sliderActive) {
-                qrResult.classList.add('hidden');
-                lastDetectedValue = '';
-                btnUpload.classList.add('hidden');
-                scaleControl.classList.add('hidden');
-            }
-        }, 3000);
     }
 
     // =========================================================================
@@ -395,7 +300,7 @@
         if (img) {
             drawWarpedImage(img, points);
         } else {
-            // Fallback: poligono debug
+            // Fallback: poligono debug con rawValue sovrimpresso
             var scaleX = overlay.width / video.videoWidth;
             var scaleY = overlay.height / video.videoHeight;
 
@@ -418,6 +323,24 @@
                 ctx.arc(points[j].x * scaleX, points[j].y * scaleY, 6, 0, Math.PI * 2);
                 ctx.fill();
             }
+
+            // Disegna il rawValue al centro del poligono
+            var cx = (points[0].x + points[1].x + points[2].x + points[3].x) / 4 * scaleX;
+            var cy = (points[0].y + points[1].y + points[2].y + points[3].y) / 4 * scaleY;
+
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.font = 'bold 14px -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Sfondo testo
+            var textWidth = ctx.measureText(qrId).width;
+            ctx.fillStyle = 'rgba(26, 26, 46, 0.8)';
+            ctx.fillRect(cx - textWidth / 2 - 6, cy - 10, textWidth + 12, 20);
+            // Testo
+            ctx.fillStyle = '#6ee7b7';
+            ctx.fillText(qrId, cx, cy);
+            ctx.restore();
         }
     }
 
@@ -453,7 +376,7 @@
                 // Pulisci smoothing per QR non più visibili
                 cleanupSmoothState(activeIds);
 
-                showQrResult(barcodes);
+                updateUI(barcodes);
                 var statusMsg = barcodes.length === 1
                     ? 'QR: ' + barcodes[0].rawValue
                     : barcodes.length + ' QR rilevati';
@@ -473,19 +396,6 @@
     // =========================================================================
     // EVENT HANDLERS
     // =========================================================================
-
-    btnUpload.addEventListener('click', function (e) {
-        e.stopPropagation();
-        fileInput.click();
-    });
-
-    fileInput.addEventListener('change', function () {
-        var file = fileInput.files[0];
-        if (file) {
-            handleFileUpload(file);
-            fileInput.value = '';
-        }
-    });
 
     var sliderActive = false;
 

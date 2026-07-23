@@ -78,59 +78,9 @@ html, body {
     text-align: center;
 }
 
-#qr-result {
-    position: absolute;
-    bottom: 24px;
-    left: 16px;
-    right: 16px;
-    padding: 16px 20px;
-    background: rgba(26, 26, 46, 0.9);
-    border: 1px solid rgba(99, 102, 241, 0.5);
-    border-radius: 12px;
-    color: #fff;
-    font-size: 16px;
-    text-align: center;
-    z-index: 10;
-    backdrop-filter: blur(8px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-#qr-result.hidden {
-    opacity: 0;
-    transform: translateY(20px);
-    pointer-events: none;
-}
-
-#qr-result #qr-value {
-    font-weight: 600;
-    word-break: break-all;
-}
-
-#btn-upload {
-    display: inline-block;
-    margin-top: 10px;
-    padding: 8px 16px;
-    background: #6366f1;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    pointer-events: auto;
-}
-
-#btn-upload.hidden {
-    display: none;
-}
-
-#btn-upload:active {
-    background: #4f46e5;
-}
-
 #scale-control {
     position: absolute;
-    bottom: 80px;
+    bottom: 24px;
     left: 16px;
     right: 16px;
     display: flex;
