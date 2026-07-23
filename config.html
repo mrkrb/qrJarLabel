@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Configurazione - QR Jar Label</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/config.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header id="header">
+            <a href="index.html" id="btn-back" aria-label="Torna alla fotocamera">&#8592;</a>
+            <h1>Associazioni QR</h1>
+            <button id="btn-add" aria-label="Aggiungi associazione">+</button>
+        </header>
+
+        <!-- Lista associazioni -->
+        <div id="list-container">
+            <div id="empty-state" class="hidden">
+                <p>Nessuna associazione configurata.</p>
+                <p>Premi <strong>+</strong> per aggiungerne una.</p>
+            </div>
+            <ul id="associations-list"></ul>
+        </div>
+
+        <!-- Modale: scansione QR per nuova associazione -->
+        <div id="modal-scan" class="modal hidden">
+            <div class="modal-content">
+                <h2>Scansiona QR code</h2>
+                <div id="scan-camera-container">
+                    <video id="scan-video" autoplay playsinline muted></video>
+                    <div id="scan-overlay"></div>
+                </div>
+                <p id="scan-status">Inquadra un QR code...</p>
+                <button id="btn-scan-cancel" class="btn-secondary">Annulla</button>
+            </div>
+        </div>
+
+        <!-- Modale: upload immagine -->
+        <div id="modal-upload" class="modal hidden">
+            <div class="modal-content">
+                <h2>Scegli immagine</h2>
+                <p id="upload-qr-label">Per: <strong id="upload-qr-id"></strong></p>
+                <div id="upload-preview-container" class="hidden">
+                    <img id="upload-preview" alt="Anteprima">
+                </div>
+                <input type="file" id="upload-file-input" accept="image/*" style="display:none">
+                <button id="btn-choose-image" class="btn-primary">Seleziona immagine</button>
+                <div id="upload-actions" class="hidden">
+                    <button id="btn-upload-save" class="btn-primary">Salva</button>
+                    <button id="btn-upload-cancel" class="btn-secondary">Annulla</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale: conferma eliminazione -->
+        <div id="modal-delete" class="modal hidden">
+            <div class="modal-content">
+                <h2>Elimina associazione</h2>
+                <p>Eliminare l'associazione per <strong id="delete-qr-id"></strong>?</p>
+                <div class="modal-actions">
+                    <button id="btn-delete-confirm" class="btn-danger">Elimina</button>
+                    <button id="btn-delete-cancel" class="btn-secondary">Annulla</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/db.js"></script>
+    <script src="js/config.js"></script>
+</body>
+</html>

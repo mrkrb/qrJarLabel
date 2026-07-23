@@ -55,6 +55,27 @@ html, body {
     text-align: center;
     z-index: 10;
     backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+}
+
+#btn-config {
+    font-size: 20px;
+    color: #e0e0e0;
+    text-decoration: none;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+#status-text {
+    flex: 1;
+    text-align: center;
 }
 
 #qr-result {
