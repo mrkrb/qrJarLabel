@@ -6,7 +6,12 @@
     var mainPlaceholder = document.getElementById('main-placeholder');
     var mainContainer = document.getElementById('main-image-container');
     var extraGrid = document.getElementById('extra-grid');
-    var fileInput = document.getElementById('file-input');
+    var fileInputGallery = document.getElementById('file-input-gallery');
+    var fileInputCamera = document.getElementById('file-input-camera');
+    var modalSource = document.getElementById('modal-source');
+    var btnSourceGallery = document.getElementById('btn-source-gallery');
+    var btnSourceCamera = document.getElementById('btn-source-camera');
+    var btnSourceCancel = document.getElementById('btn-source-cancel');
     var modalFullscreen = document.getElementById('modal-fullscreen');
     var fullscreenImage = document.getElementById('fullscreen-image');
     var btnCloseFullscreen = document.getElementById('btn-close-fullscreen');
@@ -207,7 +212,7 @@
             mainContainer.addEventListener('touchstart', function (e) {
                 longPressTimer = setTimeout(function () {
                     uploadTarget = 'main';
-                    fileInput.click();
+                    showSourceModal();
                 }, 600);
             }, { passive: true });
             mainContainer.addEventListener('touchend', function () {
@@ -223,7 +228,7 @@
 
             mainPlaceholder.addEventListener('click', function () {
                 uploadTarget = 'main';
-                fileInput.click();
+                showSourceModal();
             });
         }
 
@@ -275,7 +280,7 @@
         addPlaceholder.innerHTML = '<span>+</span>';
         addPlaceholder.addEventListener('click', function () {
             uploadTarget = 'extra';
-            fileInput.click();
+            showSourceModal();
         });
         extraGrid.appendChild(addPlaceholder);
     }
@@ -284,10 +289,33 @@
     // UPLOAD E ELIMINAZIONE
     // =========================================================================
 
-    fileInput.addEventListener('change', async function () {
-        var file = fileInput.files[0];
+    // Modale scelta sorgente
+    function showSourceModal() {
+        modalSource.classList.remove('hidden');
+    }
+
+    function hideSourceModal() {
+        modalSource.classList.add('hidden');
+    }
+
+    btnSourceGallery.addEventListener('click', function () {
+        hideSourceModal();
+        fileInputGallery.click();
+    });
+
+    btnSourceCamera.addEventListener('click', function () {
+        hideSourceModal();
+        fileInputCamera.click();
+    });
+
+    btnSourceCancel.addEventListener('click', hideSourceModal);
+    modalSource.addEventListener('click', function (e) {
+        if (e.target === modalSource) hideSourceModal();
+    });
+
+    // Handler condiviso per entrambi gli input file
+    async function handleFileSelected(file) {
         if (!file) return;
-        fileInput.value = '';
 
         try {
             var blob = await resizeImage(file, 1024);
@@ -295,7 +323,6 @@
             if (uploadTarget === 'main') {
                 await JarDB.save(qrId, blob);
             } else {
-                // Se non esiste ancora l'associazione, creala prima
                 var existing = await JarDB.get(qrId);
                 if (!existing) {
                     await JarDB.save(qrId, blob);
@@ -304,12 +331,23 @@
                 }
             }
 
-            // Ricarica galleria
             window.location.reload();
         } catch (err) {
             console.error('Errore upload:', err);
             alert('Errore: ' + err.message);
         }
+    }
+
+    fileInputGallery.addEventListener('change', function () {
+        var file = fileInputGallery.files[0];
+        fileInputGallery.value = '';
+        handleFileSelected(file);
+    });
+
+    fileInputCamera.addEventListener('change', function () {
+        var file = fileInputCamera.files[0];
+        fileInputCamera.value = '';
+        handleFileSelected(file);
     });
 
     async function removeExtra(index) {

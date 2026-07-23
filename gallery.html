@@ -29,8 +29,24 @@
             <div id="extra-grid"></div>
         </div>
 
-        <!-- Input file nascosto -->
-        <input type="file" id="file-input" accept="image/*" style="display:none">
+        <!-- Input file nascosti -->
+        <input type="file" id="file-input-gallery" accept="image/*" style="display:none">
+        <input type="file" id="file-input-camera" accept="image/*" capture="environment" style="display:none">
+
+        <!-- Modale: scelta sorgente immagine -->
+        <div id="modal-source" class="modal hidden">
+            <div class="modal-source-content">
+                <button id="btn-source-gallery" class="btn-source">
+                    <span class="btn-source-icon">&#128444;</span>
+                    <span>Galleria</span>
+                </button>
+                <button id="btn-source-camera" class="btn-source">
+                    <span class="btn-source-icon">&#128247;</span>
+                    <span>Fotocamera</span>
+                </button>
+                <button id="btn-source-cancel" class="btn-source-cancel">Annulla</button>
+            </div>
+        </div>
 
         <!-- Modale: immagine ingrandita -->
         <div id="modal-fullscreen" class="modal hidden">
@@ -39,7 +55,7 @@
         </div>
     </div>
 
-    <script src="js/db.js?v=5"></script>
-    <script src="js/gallery.js?v=5"></script>
+    <script src="js/db.js?v=6"></script>
+    <script src="js/gallery.js?v=6"></script>
 </body>
 </html>

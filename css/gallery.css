@@ -201,6 +201,47 @@ html, body {
     display: none;
 }
 
+/* Modale scelta sorgente */
+.modal-source-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 280px;
+}
+
+.btn-source {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: #1e1e3a;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    color: #e0e0e0;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.btn-source:active {
+    background: rgba(99, 102, 241, 0.15);
+}
+
+.btn-source-icon {
+    font-size: 24px;
+}
+
+.btn-source-cancel {
+    padding: 12px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    cursor: pointer;
+    text-align: center;
+    margin-top: 4px;
+}
+
 #fullscreen-image {
     max-width: 100%;
     max-height: 100%;

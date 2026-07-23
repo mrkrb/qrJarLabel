@@ -252,3 +252,63 @@ html, body {
     opacity: 0.5;
     pointer-events: none;
 }
+
+/* Impostazioni */
+#settings-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#settings-section h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 12px;
+}
+
+.setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.setting-row label {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.setting-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.setting-control input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    outline: none;
+}
+
+.setting-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #6366f1;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.setting-control span {
+    font-size: 12px;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.8);
+    min-width: 48px;
+    text-align: right;
+}

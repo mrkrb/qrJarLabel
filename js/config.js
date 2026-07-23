@@ -184,6 +184,14 @@
             }
 
             zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+
+            // Includi impostazioni
+            var settings = {
+                debounceMs: parseInt(localStorage.getItem('debounceMs') || '150', 10),
+                imageScale: parseFloat(localStorage.getItem('imageScale') || '1')
+            };
+            zip.file('settings.json', JSON.stringify(settings, null, 2));
+
             var blob = await zip.generateAsync({ type: 'blob' });
 
             var url = URL.createObjectURL(blob);
@@ -241,6 +249,18 @@
             }
 
             alert('Importate ' + imported + ' associazioni.');
+
+            // Ripristina impostazioni se presenti
+            var settingsFile = zip.file('settings.json');
+            if (settingsFile) {
+                var settingsText = await settingsFile.async('string');
+                var settings = JSON.parse(settingsText);
+                if (settings.debounceMs) localStorage.setItem('debounceMs', settings.debounceMs.toString());
+                if (settings.imageScale) localStorage.setItem('imageScale', settings.imageScale.toString());
+                // Aggiorna UI slider
+                debounceSlider.value = settings.debounceMs || 150;
+                debounceValueLabel.textContent = (settings.debounceMs || 150) + 'ms';
+            }
             await loadList();
         } catch (err) {
             console.error('Errore import:', err);
@@ -250,6 +270,26 @@
             btnImport.innerHTML = '&#8593; Importa backup';
         }
     }
+
+    // =========================================================================
+    // IMPOSTAZIONI
+    // =========================================================================
+
+    var debounceSlider = document.getElementById('debounce-slider');
+    var debounceValueLabel = document.getElementById('debounce-value');
+
+    // Carica valore salvato
+    var savedDebounce = localStorage.getItem('debounceMs') || '150';
+    debounceSlider.value = savedDebounce;
+    debounceValueLabel.textContent = savedDebounce + 'ms';
+
+    function onDebounceChange() {
+        var val = debounceSlider.value;
+        debounceValueLabel.textContent = val + 'ms';
+        localStorage.setItem('debounceMs', val);
+    }
+    debounceSlider.addEventListener('input', onDebounceChange);
+    debounceSlider.addEventListener('change', onDebounceChange);
 
     // =========================================================================
     // EVENT LISTENERS

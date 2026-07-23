@@ -28,6 +28,18 @@
                 <button id="btn-import" class="btn-backup">&#8593; Importa backup</button>
                 <input type="file" id="import-file-input" accept=".zip" style="display:none">
             </div>
+
+            <!-- Impostazioni -->
+            <div id="settings-section">
+                <h2>Impostazioni</h2>
+                <div class="setting-row">
+                    <label for="debounce-slider">Debounce overlay</label>
+                    <div class="setting-control">
+                        <input type="range" id="debounce-slider" min="50" max="500" step="25" value="150">
+                        <span id="debounce-value">150ms</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Modale: conferma eliminazione -->
@@ -44,7 +56,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="js/db.js?v=4"></script>
-    <script src="js/config.js?v=4"></script>
+    <script src="js/db.js?v=6"></script>
+    <script src="js/config.js?v=6"></script>
 </body>
 </html>

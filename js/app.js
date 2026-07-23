@@ -354,7 +354,8 @@
 
     // Debounce: mantieni l'overlay visibile per un breve periodo dopo che
     // il QR sparisce dalla detection, per evitare flickering.
-    var DEBOUNCE_MS = 150;
+    // Valore configurabile dalla schermata impostazioni (localStorage).
+    var DEBOUNCE_MS = parseInt(localStorage.getItem('debounceMs') || '150', 10);
     // { qrId: { cornerPoints, lastSeen: timestamp } }
     var lastSeenState = {};
 
