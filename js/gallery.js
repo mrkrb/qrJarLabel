@@ -28,22 +28,127 @@
     var uploadTarget = null; // 'main' o 'extra'
 
     // =========================================================================
-    // FULLSCREEN
+    // FULLSCREEN CON PINCH-TO-ZOOM E PAN
     // =========================================================================
+
+    var fsScale = 1;
+    var fsPanX = 0;
+    var fsPanY = 0;
+    var fsLastDist = 0;
+    var fsLastCenter = null;
+    var fsPanning = false;
+    var fsPanStart = null;
+
+    function applyFsTransform() {
+        fullscreenImage.style.transform =
+            'translate(' + fsPanX + 'px, ' + fsPanY + 'px) scale(' + fsScale + ')';
+    }
+
+    function resetFsTransform() {
+        fsScale = 1;
+        fsPanX = 0;
+        fsPanY = 0;
+        fullscreenImage.style.transform = '';
+    }
 
     function showFullscreen(url) {
         fullscreenImage.src = url;
         modalFullscreen.classList.remove('hidden');
+        resetFsTransform();
     }
 
     function hideFullscreen() {
         modalFullscreen.classList.add('hidden');
         fullscreenImage.src = '';
+        resetFsTransform();
     }
 
-    btnCloseFullscreen.addEventListener('click', hideFullscreen);
+    btnCloseFullscreen.addEventListener('click', function (e) {
+        e.stopPropagation();
+        hideFullscreen();
+    });
+
+    // Tap su sfondo chiude (solo se non stava zoomando/pannando)
+    var fsTapTime = 0;
     modalFullscreen.addEventListener('click', function (e) {
-        if (e.target === modalFullscreen) hideFullscreen();
+        if (e.target === modalFullscreen && fsScale <= 1.05) {
+            hideFullscreen();
+        }
+    });
+
+    // Pinch-to-zoom + pan
+    modalFullscreen.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 2) {
+            // Inizio pinch
+            var dx = e.touches[1].clientX - e.touches[0].clientX;
+            var dy = e.touches[1].clientY - e.touches[0].clientY;
+            fsLastDist = Math.sqrt(dx * dx + dy * dy);
+            fsLastCenter = {
+                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+            };
+            fsPanning = false;
+        } else if (e.touches.length === 1 && fsScale > 1.05) {
+            // Inizio pan (solo se zoomato)
+            fsPanning = true;
+            fsPanStart = { x: e.touches[0].clientX - fsPanX, y: e.touches[0].clientY - fsPanY };
+        }
+    }, { passive: true });
+
+    modalFullscreen.addEventListener('touchmove', function (e) {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            var dx = e.touches[1].clientX - e.touches[0].clientX;
+            var dy = e.touches[1].clientY - e.touches[0].clientY;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (fsLastDist > 0) {
+                var delta = dist / fsLastDist;
+                fsScale = Math.max(1, Math.min(5, fsScale * delta));
+                applyFsTransform();
+            }
+            fsLastDist = dist;
+        } else if (e.touches.length === 1 && fsPanning && fsPanStart) {
+            e.preventDefault();
+            fsPanX = e.touches[0].clientX - fsPanStart.x;
+            fsPanY = e.touches[0].clientY - fsPanStart.y;
+            applyFsTransform();
+        }
+    }, { passive: false });
+
+    modalFullscreen.addEventListener('touchend', function (e) {
+        if (e.touches.length < 2) {
+            fsLastDist = 0;
+            fsLastCenter = null;
+        }
+        if (e.touches.length === 0) {
+            fsPanning = false;
+            fsPanStart = null;
+            // Se scala torna a ~1, resetta pan
+            if (fsScale <= 1.05) {
+                fsScale = 1;
+                fsPanX = 0;
+                fsPanY = 0;
+                applyFsTransform();
+            }
+        }
+    }, { passive: true });
+
+    // Double-tap per reset zoom
+    var lastTapTime = 0;
+    fullscreenImage.addEventListener('touchend', function (e) {
+        var now = Date.now();
+        if (now - lastTapTime < 300) {
+            // Double tap
+            if (fsScale > 1.05) {
+                resetFsTransform();
+                applyFsTransform();
+            } else {
+                fsScale = 2.5;
+                applyFsTransform();
+            }
+        }
+        lastTapTime = now;
     });
 
     // =========================================================================

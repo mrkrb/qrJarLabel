@@ -194,6 +194,7 @@ html, body {
     justify-content: center;
     z-index: 100;
     padding: 16px;
+    touch-action: none;
 }
 
 .modal.hidden {
@@ -205,6 +206,8 @@ html, body {
     max-height: 100%;
     object-fit: contain;
     border-radius: 4px;
+    transform-origin: center center;
+    will-change: transform;
 }
 
 #btn-close-fullscreen {
