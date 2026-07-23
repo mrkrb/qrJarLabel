@@ -132,6 +132,9 @@
         modalScan.classList.remove('hidden');
         scanStatus.textContent = 'Inquadra un QR code...';
 
+        // Piccolo delay per assicurare che il modale sia renderizzato
+        await new Promise(function (r) { setTimeout(r, 100); });
+
         try {
             // Inizializza detector
             if (!scanDetector && 'BarcodeDetector' in window) {
@@ -144,12 +147,15 @@
                 audio: false
             });
             scanVideo.srcObject = scanStream;
+
+            // Forza play dopo assegnazione srcObject
             await scanVideo.play();
 
             // Avvia detection loop
             scanLoop();
         } catch (err) {
             scanStatus.textContent = 'Errore fotocamera: ' + err.message;
+            console.error('Errore scan camera:', err);
         }
     }
 
