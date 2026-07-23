@@ -35,7 +35,11 @@
                     <div id="scan-overlay"></div>
                 </div>
                 <p id="scan-status">Inquadra un QR code...</p>
-                <button id="btn-scan-cancel" class="btn-secondary">Annulla</button>
+                <p id="scan-detected" class="hidden">Codice: <strong id="scan-detected-value"></strong></p>
+                <div id="scan-actions">
+                    <button id="btn-scan-confirm" class="btn-primary hidden">Associa immagine</button>
+                    <button id="btn-scan-cancel" class="btn-secondary">Annulla</button>
+                </div>
             </div>
         </div>
 
@@ -53,6 +57,7 @@
                     <button id="btn-upload-save" class="btn-primary">Salva</button>
                     <button id="btn-upload-cancel" class="btn-secondary">Annulla</button>
                 </div>
+                <button id="btn-upload-close" class="btn-secondary" style="margin-top:12px">Chiudi</button>
             </div>
         </div>
 

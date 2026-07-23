@@ -10,6 +10,9 @@
     var modalScan = document.getElementById('modal-scan');
     var scanVideo = document.getElementById('scan-video');
     var scanStatus = document.getElementById('scan-status');
+    var scanDetected = document.getElementById('scan-detected');
+    var scanDetectedValue = document.getElementById('scan-detected-value');
+    var btnScanConfirm = document.getElementById('btn-scan-confirm');
     var btnScanCancel = document.getElementById('btn-scan-cancel');
 
     // Modale upload
@@ -22,6 +25,7 @@
     var uploadActions = document.getElementById('upload-actions');
     var btnUploadSave = document.getElementById('btn-upload-save');
     var btnUploadCancel = document.getElementById('btn-upload-cancel');
+    var btnUploadClose = document.getElementById('btn-upload-close');
 
     // Modale delete
     var modalDelete = document.getElementById('modal-delete');
@@ -33,6 +37,7 @@
     var scanStream = null;
     var scanDetector = null;
     var scanAnimFrame = null;
+    var scannedQrId = null; // QR rilevato durante la scansione (attende conferma)
     var currentQrIdForUpload = null;
     var currentFileForUpload = null;
     var deleteTargetId = null;
@@ -43,7 +48,6 @@
 
     async function loadList() {
         var associations = await JarDB.getAll();
-
         listEl.innerHTML = '';
 
         if (associations.length === 0) {
@@ -52,15 +56,12 @@
         }
 
         emptyState.classList.add('hidden');
-
-        // Ordina per data creazione (più recente prima)
         associations.sort(function (a, b) {
             return (b.createdAt || 0) - (a.createdAt || 0);
         });
 
         for (var i = 0; i < associations.length; i++) {
-            var assoc = associations[i];
-            listEl.appendChild(createListItem(assoc));
+            listEl.appendChild(createListItem(associations[i]));
         }
     }
 
@@ -68,7 +69,6 @@
         var li = document.createElement('li');
         li.className = 'assoc-item';
 
-        // Thumbnail
         var thumb = document.createElement('img');
         thumb.className = 'assoc-thumb';
         if (assoc.imageBlob) {
@@ -76,7 +76,6 @@
         }
         thumb.alt = assoc.qrId;
 
-        // Info
         var info = document.createElement('div');
         info.className = 'assoc-info';
 
@@ -94,13 +93,12 @@
         info.appendChild(qrLabel);
         info.appendChild(dateLabel);
 
-        // Azioni
         var actions = document.createElement('div');
         actions.className = 'assoc-actions';
 
         var btnEdit = document.createElement('button');
         btnEdit.className = 'btn-icon btn-edit';
-        btnEdit.innerHTML = '&#9998;'; // ✎
+        btnEdit.innerHTML = '&#9998;';
         btnEdit.setAttribute('aria-label', 'Modifica immagine');
         btnEdit.addEventListener('click', function () {
             openUploadModal(assoc.qrId);
@@ -108,7 +106,7 @@
 
         var btnDel = document.createElement('button');
         btnDel.className = 'btn-icon btn-delete';
-        btnDel.innerHTML = '&#128465;'; // 🗑
+        btnDel.innerHTML = '&#128465;';
         btnDel.setAttribute('aria-label', 'Elimina');
         btnDel.addEventListener('click', function () {
             openDeleteModal(assoc.qrId);
@@ -120,28 +118,27 @@
         li.appendChild(thumb);
         li.appendChild(info);
         li.appendChild(actions);
-
         return li;
     }
 
     // =========================================================================
-    // MODALE: SCANSIONE QR
+    // MODALE: SCANSIONE QR (con conferma manuale)
     // =========================================================================
 
     async function openScanModal() {
         modalScan.classList.remove('hidden');
         scanStatus.textContent = 'Avvio fotocamera...';
+        scanDetected.classList.add('hidden');
+        btnScanConfirm.classList.add('hidden');
+        scannedQrId = null;
 
-        // Piccolo delay per assicurare che il modale sia renderizzato
         await new Promise(function (r) { setTimeout(r, 200); });
 
         try {
-            // Inizializza detector
             if (!scanDetector && 'BarcodeDetector' in window) {
                 scanDetector = new BarcodeDetector({ formats: ['qr_code'] });
             }
 
-            // Avvia fotocamera (con retry)
             var attempts = 0;
             while (attempts < 3) {
                 try {
@@ -162,12 +159,10 @@
             scanVideo.setAttribute('autoplay', '');
             scanVideo.muted = true;
 
-            // Attendi che il video sia pronto
             await new Promise(function (resolve, reject) {
                 scanVideo.onloadedmetadata = function () {
                     scanVideo.play().then(resolve).catch(reject);
                 };
-                // Timeout fallback
                 setTimeout(function () {
                     scanVideo.play().then(resolve).catch(reject);
                 }, 1000);
@@ -184,6 +179,7 @@
     function closeScanModal() {
         modalScan.classList.add('hidden');
         stopScan();
+        scannedQrId = null;
     }
 
     function stopScan() {
@@ -207,20 +203,35 @@
         scanDetector.detect(scanVideo).then(function (barcodes) {
             if (barcodes.length > 0) {
                 var qrId = barcodes[0].rawValue;
-                scanStatus.textContent = 'Rilevato: ' + qrId;
-                stopScan();
 
-                // Breve pausa poi apri upload
-                setTimeout(function () {
-                    closeScanModal();
-                    openUploadModal(qrId);
-                }, 500);
-                return;
+                // Mostra il QR rilevato e abilita il pulsante conferma
+                scannedQrId = qrId;
+                scanDetectedValue.textContent = qrId;
+                scanDetected.classList.remove('hidden');
+                btnScanConfirm.classList.remove('hidden');
+                scanStatus.textContent = 'QR rilevato!';
+            } else {
+                // Nessun QR visibile: resetta
+                if (scannedQrId) {
+                    scannedQrId = null;
+                    scanDetected.classList.add('hidden');
+                    btnScanConfirm.classList.add('hidden');
+                    scanStatus.textContent = 'Inquadra un QR code...';
+                }
             }
+
             scanAnimFrame = requestAnimationFrame(scanLoop);
         }).catch(function () {
             scanAnimFrame = requestAnimationFrame(scanLoop);
         });
+    }
+
+    function confirmScan() {
+        if (!scannedQrId) return;
+        var qrId = scannedQrId;
+        stopScan();
+        closeScanModal();
+        openUploadModal(qrId);
     }
 
     // =========================================================================
@@ -253,10 +264,7 @@
     function onFileSelected() {
         var file = uploadFileInput.files[0];
         if (!file) return;
-
         currentFileForUpload = file;
-
-        // Mostra anteprima
         uploadPreview.src = URL.createObjectURL(file);
         uploadPreviewContainer.classList.remove('hidden');
         uploadActions.classList.remove('hidden');
@@ -270,14 +278,12 @@
         btnUploadSave.disabled = true;
 
         try {
-            // Ridimensiona
             var blob = await resizeImage(currentFileForUpload, 1024);
             await JarDB.save(currentQrIdForUpload, blob);
             closeUploadModal();
             await loadList();
         } catch (err) {
             console.error('Errore salvataggio:', err);
-            // Fallback: salva originale
             try {
                 await JarDB.save(currentQrIdForUpload, currentFileForUpload);
                 closeUploadModal();
@@ -291,9 +297,6 @@
         }
     }
 
-    /**
-     * Ridimensiona immagine (stessa logica di app.js).
-     */
     function resizeImage(file, maxSize) {
         return new Promise(function (resolve, reject) {
             var url = URL.createObjectURL(file);
@@ -301,7 +304,6 @@
             img.onload = function () {
                 var w = img.naturalWidth;
                 var h = img.naturalHeight;
-
                 if (w > maxSize || h > maxSize) {
                     if (w >= h) {
                         h = Math.round(h * (maxSize / w));
@@ -311,21 +313,15 @@
                         h = maxSize;
                     }
                 }
-
                 var canvas = document.createElement('canvas');
                 canvas.width = w;
                 canvas.height = h;
                 var c = canvas.getContext('2d');
                 c.drawImage(img, 0, 0, w, h);
-
                 URL.revokeObjectURL(url);
-
                 canvas.toBlob(function (blob) {
-                    if (blob) {
-                        resolve(blob);
-                    } else {
-                        reject(new Error('Errore conversione'));
-                    }
+                    if (blob) resolve(blob);
+                    else reject(new Error('Errore conversione'));
                 }, 'image/jpeg', 0.85);
             };
             img.onerror = function () {
@@ -353,7 +349,6 @@
 
     async function confirmDelete() {
         if (!deleteTargetId) return;
-
         try {
             await JarDB.delete(deleteTargetId);
             closeDeleteModal();
@@ -368,6 +363,7 @@
     // =========================================================================
 
     btnAdd.addEventListener('click', openScanModal);
+    btnScanConfirm.addEventListener('click', confirmScan);
     btnScanCancel.addEventListener('click', closeScanModal);
 
     btnChooseImage.addEventListener('click', function () {
@@ -376,6 +372,7 @@
     uploadFileInput.addEventListener('change', onFileSelected);
     btnUploadSave.addEventListener('click', saveUpload);
     btnUploadCancel.addEventListener('click', closeUploadModal);
+    btnUploadClose.addEventListener('click', closeUploadModal);
 
     btnDeleteConfirm.addEventListener('click', confirmDelete);
     btnDeleteCancel.addEventListener('click', closeDeleteModal);

@@ -242,7 +242,29 @@ html, body {
 #scan-status {
     font-size: 14px;
     color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 16px;
+    margin-bottom: 8px;
+}
+
+#scan-detected {
+    font-size: 15px;
+    color: #6ee7b7;
+    margin-bottom: 12px;
+    word-break: break-all;
+}
+
+#scan-detected.hidden {
+    display: none;
+}
+
+#scan-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+#btn-scan-confirm.hidden {
+    display: none;
 }
 
 /* Upload preview */
