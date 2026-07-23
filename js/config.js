@@ -96,10 +96,18 @@
         var actions = document.createElement('div');
         actions.className = 'assoc-actions';
 
+        var btnAddExtra = document.createElement('button');
+        btnAddExtra.className = 'btn-icon btn-add-extra';
+        btnAddExtra.innerHTML = '&#128247;'; // 📷
+        btnAddExtra.setAttribute('aria-label', 'Aggiungi immagine secondaria');
+        btnAddExtra.addEventListener('click', function () {
+            openExtraUploadModal(assoc.qrId);
+        });
+
         var btnEdit = document.createElement('button');
         btnEdit.className = 'btn-icon btn-edit';
         btnEdit.innerHTML = '&#9998;';
-        btnEdit.setAttribute('aria-label', 'Modifica immagine');
+        btnEdit.setAttribute('aria-label', 'Modifica immagine principale');
         btnEdit.addEventListener('click', function () {
             openUploadModal(assoc.qrId);
         });
@@ -112,8 +120,18 @@
             openDeleteModal(assoc.qrId);
         });
 
+        actions.appendChild(btnAddExtra);
         actions.appendChild(btnEdit);
         actions.appendChild(btnDel);
+
+        // Mostra conteggio immagini extra
+        var extraCount = (assoc.extraImages && assoc.extraImages.length) || 0;
+        if (extraCount > 0) {
+            var extraBadge = document.createElement('div');
+            extraBadge.className = 'assoc-extra-count';
+            extraBadge.textContent = '+' + extraCount + ' foto';
+            info.appendChild(extraBadge);
+        }
 
         li.appendChild(thumb);
         li.appendChild(info);
@@ -308,13 +326,23 @@
 
         try {
             var blob = await resizeImage(currentFileForUpload, 1024);
-            await JarDB.save(currentQrIdForUpload, blob);
+
+            if (isExtraUpload) {
+                await JarDB.addExtra(currentQrIdForUpload, blob);
+            } else {
+                await JarDB.save(currentQrIdForUpload, blob);
+            }
+
             closeUploadModal();
             await loadList();
         } catch (err) {
             console.error('Errore salvataggio:', err);
             try {
-                await JarDB.save(currentQrIdForUpload, currentFileForUpload);
+                if (isExtraUpload) {
+                    await JarDB.addExtra(currentQrIdForUpload, currentFileForUpload);
+                } else {
+                    await JarDB.save(currentQrIdForUpload, currentFileForUpload);
+                }
                 closeUploadModal();
                 await loadList();
             } catch (err2) {
@@ -323,6 +351,7 @@
         } finally {
             btnUploadSave.textContent = 'Salva';
             btnUploadSave.disabled = false;
+            isExtraUpload = false;
         }
     }
 
@@ -388,6 +417,26 @@
     }
 
     // =========================================================================
+    // MODALE: UPLOAD IMMAGINE EXTRA (secondaria)
+    // =========================================================================
+
+    var isExtraUpload = false;
+
+    function openExtraUploadModal(qrId) {
+        isExtraUpload = true;
+        currentQrIdForUpload = qrId;
+        currentFileForUpload = null;
+
+        uploadQrId.textContent = qrId + ' (immagine aggiuntiva)';
+        uploadPreviewContainer.classList.add('hidden');
+        uploadActions.classList.add('hidden');
+        btnChooseImage.style.display = '';
+        uploadFileInput.value = '';
+
+        modalUpload.classList.remove('hidden');
+    }
+
+    // =========================================================================
     // EXPORT / IMPORT BACKUP (ZIP)
     // =========================================================================
 
@@ -416,7 +465,6 @@
 
             for (var i = 0; i < associations.length; i++) {
                 var assoc = associations[i];
-                // Sanitizza il nome file (rimuovi caratteri non validi)
                 var safeName = assoc.qrId.replace(/[^a-zA-Z0-9_\-:.]/g, '_');
                 var ext = 'jpg';
                 if (assoc.imageBlob && assoc.imageBlob.type === 'image/png') {
@@ -424,22 +472,36 @@
                 }
                 var filename = 'images/' + safeName + '.' + ext;
 
-                manifest.push({
+                var entry = {
                     qrId: assoc.qrId,
                     filename: filename,
+                    extraFilenames: [],
                     createdAt: assoc.createdAt || null
-                });
+                };
 
                 if (assoc.imageBlob) {
                     zip.file(filename, assoc.imageBlob);
                 }
+
+                // Immagini extra
+                var extras = assoc.extraImages || [];
+                for (var j = 0; j < extras.length; j++) {
+                    var extraExt = 'jpg';
+                    if (extras[j] && extras[j].type === 'image/png') {
+                        extraExt = 'png';
+                    }
+                    var extraFilename = 'images/' + safeName + '_extra' + (j + 1) + '.' + extraExt;
+                    entry.extraFilenames.push(extraFilename);
+                    zip.file(extraFilename, extras[j]);
+                }
+
+                manifest.push(entry);
             }
 
             zip.file('manifest.json', JSON.stringify(manifest, null, 2));
 
             var blob = await zip.generateAsync({ type: 'blob' });
 
-            // Scarica il file
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
@@ -468,7 +530,6 @@
         try {
             var zip = await JSZip.loadAsync(file);
 
-            // Leggi manifest
             var manifestFile = zip.file('manifest.json');
             if (!manifestFile) {
                 alert('File ZIP non valido: manca manifest.json');
@@ -481,11 +542,23 @@
             var imported = 0;
             for (var i = 0; i < manifest.length; i++) {
                 var entry = manifest[i];
+
+                // Immagine principale
                 var imgFile = zip.file(entry.filename);
                 if (imgFile) {
                     var imgBlob = await imgFile.async('blob');
                     await JarDB.save(entry.qrId, imgBlob);
                     imported++;
+                }
+
+                // Immagini extra
+                var extraFilenames = entry.extraFilenames || [];
+                for (var j = 0; j < extraFilenames.length; j++) {
+                    var extraFile = zip.file(extraFilenames[j]);
+                    if (extraFile) {
+                        var extraBlob = await extraFile.async('blob');
+                        await JarDB.addExtra(entry.qrId, extraBlob);
+                    }
                 }
             }
 

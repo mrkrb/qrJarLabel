@@ -156,6 +156,21 @@ html, body {
     background: rgba(99, 102, 241, 0.4);
 }
 
+.btn-add-extra {
+    background: rgba(110, 231, 183, 0.15);
+    color: #6ee7b7;
+}
+
+.btn-add-extra:active {
+    background: rgba(110, 231, 183, 0.3);
+}
+
+.assoc-extra-count {
+    font-size: 11px;
+    color: #6ee7b7;
+    margin-top: 3px;
+}
+
 .btn-delete {
     background: rgba(239, 68, 68, 0.15);
     color: #fca5a5;

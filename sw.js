@@ -1,13 +1,16 @@
-const CACHE_NAME = 'qr-jar-label-v25';
+const CACHE_NAME = 'qr-jar-label-v26';
 const ASSETS = [
     './',
     './index.html',
     './config.html',
+    './gallery.html',
     './css/style.css',
     './css/config.css',
+    './css/gallery.css',
     './js/db.js',
     './js/app.js',
     './js/config.js',
+    './js/gallery.js',
     './manifest.json',
     './icons/icon-192.png',
     './icons/icon-512.png'

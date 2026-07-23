@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Galleria - QR Jar Label</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/gallery.css">
+</head>
+<body>
+    <div id="app">
+        <header id="header">
+            <a href="index.html" id="btn-back" aria-label="Torna alla fotocamera">&#8592;</a>
+            <h1 id="gallery-title">Galleria</h1>
+        </header>
+
+        <div id="gallery-content">
+            <!-- Immagine principale -->
+            <div id="main-image-container">
+                <img id="main-image" alt="Immagine principale">
+                <span id="main-label">Immagine principale</span>
+            </div>
+
+            <!-- Immagini secondarie -->
+            <div id="extra-section" class="hidden">
+                <h2 id="extra-title">Altre immagini</h2>
+                <div id="extra-grid"></div>
+            </div>
+
+            <!-- Stato vuoto -->
+            <div id="no-extras" class="hidden">
+                <p>Nessuna immagine aggiuntiva.</p>
+            </div>
+        </div>
+
+        <!-- Modale: immagine ingrandita -->
+        <div id="modal-fullscreen" class="modal hidden">
+            <img id="fullscreen-image" alt="Immagine ingrandita">
+            <button id="btn-close-fullscreen" aria-label="Chiudi">&#10005;</button>
+        </div>
+    </div>
+
+    <script src="js/db.js"></script>
+    <script src="js/gallery.js"></script>
+</body>
+</html>

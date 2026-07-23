@@ -19,6 +19,10 @@
     // Cache delle immagini caricate da IndexedDB: { qrId: HTMLImageElement }
     var imageCache = {};
 
+    // Aree toccabili: QR con immagine attualmente visibili e i loro corner points
+    // [{ qrId, points: [{x,y}...] }] — aggiornato ad ogni frame
+    var touchableAreas = [];
+
     // =========================================================================
     // SMOOTHING TEMPORALE (EMA) — PER-QR
     //
@@ -367,11 +371,25 @@
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
 
                 var activeIds = [];
+                var newTouchable = [];
                 for (var i = 0; i < barcodes.length; i++) {
                     var qr = barcodes[i];
                     activeIds.push(qr.rawValue);
                     drawSingleOverlay(qr.rawValue, qr.cornerPoints);
+
+                    // Traccia aree toccabili (solo QR con immagine)
+                    if (imageCache[qr.rawValue]) {
+                        var scX = overlay.width / video.videoWidth;
+                        var scY = overlay.height / video.videoHeight;
+                        newTouchable.push({
+                            qrId: qr.rawValue,
+                            points: qr.cornerPoints.map(function (p) {
+                                return { x: p.x * scX, y: p.y * scY };
+                            })
+                        });
+                    }
                 }
+                touchableAreas = newTouchable;
 
                 // Pulisci smoothing per QR non più visibili
                 cleanupSmoothState(activeIds);
@@ -415,6 +433,49 @@
     });
     scaleControl.addEventListener('touchend', function () {
         sliderActive = false;
+    });
+
+    // Tocco sull'overlay: se tocca un QR con immagine, apre la galleria
+    /**
+     * Verifica se un punto (px, py) è dentro un poligono convesso definito
+     * dai suoi vertici (algoritmo cross product).
+     */
+    function isPointInQuad(px, py, points) {
+        var n = points.length;
+        var sign = 0;
+        for (var i = 0; i < n; i++) {
+            var x1 = points[i].x, y1 = points[i].y;
+            var x2 = points[(i + 1) % n].x, y2 = points[(i + 1) % n].y;
+            var cross = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1);
+            if (cross !== 0) {
+                if (sign === 0) sign = cross > 0 ? 1 : -1;
+                else if ((cross > 0 ? 1 : -1) !== sign) return false;
+            }
+        }
+        return true;
+    }
+
+    overlay.addEventListener('click', function (e) {
+        if (touchableAreas.length === 0) return;
+
+        // Coordinate del tocco relative al canvas renderizzato
+        var rect = overlay.getBoundingClientRect();
+        var cssX = e.clientX - rect.left;
+        var cssY = e.clientY - rect.top;
+
+        // Converti da coordinate CSS a coordinate interne del canvas
+        // (il canvas ha object-fit: cover, stessa logica del video)
+        var canvasX = cssX * (overlay.width / rect.width);
+        var canvasY = cssY * (overlay.height / rect.height);
+
+        for (var i = 0; i < touchableAreas.length; i++) {
+            var area = touchableAreas[i];
+            if (isPointInQuad(canvasX, canvasY, area.points)) {
+                // Apri galleria per questo QR
+                window.location.href = 'gallery.html?qr=' + encodeURIComponent(area.qrId);
+                return;
+            }
+        }
     });
 
     // =========================================================================

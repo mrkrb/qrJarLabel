@@ -1,10 +1,13 @@
 /**
- * Modulo IndexedDB per la persistenza delle associazioni QR → immagine.
+ * Modulo IndexedDB per la persistenza delle associazioni QR → immagini.
  *
  * Ogni record ha la forma:
- *   { qrId: string, imageBlob: Blob, createdAt: number }
+ *   { qrId: string, imageBlob: Blob, extraImages: [Blob], createdAt: number }
  *
- * Lo store usa qrId come keyPath (un QR = un'immagine).
+ * - imageBlob: immagine principale (usata per l'overlay AR)
+ * - extraImages: array di immagini secondarie (consultabili nella galleria)
+ *
+ * Lo store usa qrId come keyPath (un QR = un set di immagini).
  */
 var JarDB = (function () {
     'use strict';
@@ -15,9 +18,6 @@ var JarDB = (function () {
 
     var dbPromise = null;
 
-    /**
-     * Apre (o crea) il database. Restituisce una Promise<IDBDatabase>.
-     */
     function open() {
         if (dbPromise) return dbPromise;
 
@@ -45,32 +45,90 @@ var JarDB = (function () {
     }
 
     /**
-     * Salva un'associazione QR → immagine (crea o sovrascrive).
-     * @param {string} qrId - Identificativo del QR code (rawValue)
-     * @param {Blob} imageBlob - Immagine come Blob
-     * @returns {Promise<void>}
+     * Salva l'immagine principale per un QR (preserva extraImages se esistenti).
      */
     function saveAssociation(qrId, imageBlob) {
         return open().then(function (db) {
             return new Promise(function (resolve, reject) {
                 var tx = db.transaction(STORE_NAME, 'readwrite');
                 var store = tx.objectStore(STORE_NAME);
-                var record = {
-                    qrId: qrId,
-                    imageBlob: imageBlob,
-                    createdAt: Date.now()
+
+                // Prima leggi il record esistente per preservare extraImages
+                var getReq = store.get(qrId);
+                getReq.onsuccess = function () {
+                    var existing = getReq.result;
+                    var record = {
+                        qrId: qrId,
+                        imageBlob: imageBlob,
+                        extraImages: (existing && existing.extraImages) ? existing.extraImages : [],
+                        createdAt: (existing && existing.createdAt) ? existing.createdAt : Date.now()
+                    };
+                    var putReq = store.put(record);
+                    putReq.onsuccess = function () { resolve(); };
+                    putReq.onerror = function (e) { reject(e.target.error); };
                 };
-                var request = store.put(record);
-                request.onsuccess = function () { resolve(); };
-                request.onerror = function (e) { reject(e.target.error); };
+                getReq.onerror = function (e) { reject(e.target.error); };
+            });
+        });
+    }
+
+    /**
+     * Aggiunge un'immagine secondaria a un QR esistente.
+     */
+    function addExtraImage(qrId, imageBlob) {
+        return open().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(STORE_NAME, 'readwrite');
+                var store = tx.objectStore(STORE_NAME);
+
+                var getReq = store.get(qrId);
+                getReq.onsuccess = function () {
+                    var existing = getReq.result;
+                    if (!existing) {
+                        reject(new Error('Associazione non trovata: ' + qrId));
+                        return;
+                    }
+                    if (!existing.extraImages) {
+                        existing.extraImages = [];
+                    }
+                    existing.extraImages.push(imageBlob);
+                    var putReq = store.put(existing);
+                    putReq.onsuccess = function () { resolve(); };
+                    putReq.onerror = function (e) { reject(e.target.error); };
+                };
+                getReq.onerror = function (e) { reject(e.target.error); };
+            });
+        });
+    }
+
+    /**
+     * Rimuove un'immagine secondaria per indice.
+     */
+    function removeExtraImage(qrId, index) {
+        return open().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(STORE_NAME, 'readwrite');
+                var store = tx.objectStore(STORE_NAME);
+
+                var getReq = store.get(qrId);
+                getReq.onsuccess = function () {
+                    var existing = getReq.result;
+                    if (!existing || !existing.extraImages) {
+                        reject(new Error('Nessuna immagine extra trovata'));
+                        return;
+                    }
+                    existing.extraImages.splice(index, 1);
+                    var putReq = store.put(existing);
+                    putReq.onsuccess = function () { resolve(); };
+                    putReq.onerror = function (e) { reject(e.target.error); };
+                };
+                getReq.onerror = function (e) { reject(e.target.error); };
             });
         });
     }
 
     /**
      * Recupera un'associazione per qrId.
-     * @param {string} qrId
-     * @returns {Promise<{qrId, imageBlob, createdAt}|null>}
      */
     function getAssociation(qrId) {
         return open().then(function (db) {
@@ -88,7 +146,6 @@ var JarDB = (function () {
 
     /**
      * Recupera tutte le associazioni.
-     * @returns {Promise<Array<{qrId, imageBlob, createdAt}>>}
      */
     function getAllAssociations() {
         return open().then(function (db) {
@@ -106,8 +163,6 @@ var JarDB = (function () {
 
     /**
      * Elimina un'associazione.
-     * @param {string} qrId
-     * @returns {Promise<void>}
      */
     function deleteAssociation(qrId) {
         return open().then(function (db) {
@@ -121,12 +176,13 @@ var JarDB = (function () {
         });
     }
 
-    // API pubblica
     return {
         open: open,
         save: saveAssociation,
         get: getAssociation,
         getAll: getAllAssociations,
-        delete: deleteAssociation
+        delete: deleteAssociation,
+        addExtra: addExtraImage,
+        removeExtra: removeExtraImage
     };
 })();
