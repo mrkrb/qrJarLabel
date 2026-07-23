@@ -13,13 +13,13 @@
     let detector = null;
     let animFrameId = null;
 
-    // Scala immagine overlay (controllata dallo slider)
-    var imageScale = 1.0;
+    // Scala immagine overlay (controllata dallo slider, persistente)
+    var imageScale = parseFloat(localStorage.getItem('imageScale') || '1');
 
     // Cache delle immagini caricate da IndexedDB: { qrId: HTMLImageElement }
     var imageCache = {};
 
-    // Aree toccabili: QR con immagine attualmente visibili e i loro corner points
+    // Aree toccabili: TUTTI i QR visibili e i loro corner points (per navigare alla galleria)
     // [{ qrId, points: [{x,y}...] }] — aggiornato ad ogni frame
     var touchableAreas = [];
 
@@ -377,17 +377,15 @@
                     activeIds.push(qr.rawValue);
                     drawSingleOverlay(qr.rawValue, qr.cornerPoints);
 
-                    // Traccia aree toccabili (solo QR con immagine)
-                    if (imageCache[qr.rawValue]) {
-                        var scX = overlay.width / video.videoWidth;
-                        var scY = overlay.height / video.videoHeight;
-                        newTouchable.push({
-                            qrId: qr.rawValue,
-                            points: qr.cornerPoints.map(function (p) {
-                                return { x: p.x * scX, y: p.y * scY };
-                            })
-                        });
-                    }
+                    // Tutti i QR sono toccabili (aprono la galleria)
+                    var scX = overlay.width / video.videoWidth;
+                    var scY = overlay.height / video.videoHeight;
+                    newTouchable.push({
+                        qrId: qr.rawValue,
+                        points: qr.cornerPoints.map(function (p) {
+                            return { x: p.x * scX, y: p.y * scY };
+                        })
+                    });
                 }
                 touchableAreas = newTouchable;
 
@@ -417,9 +415,14 @@
 
     var sliderActive = false;
 
+    // Imposta il valore iniziale dello slider dal localStorage
+    scaleSlider.value = imageScale;
+    scaleValueLabel.textContent = imageScale.toFixed(1) + 'x';
+
     function onScaleChange() {
         imageScale = parseFloat(scaleSlider.value);
         scaleValueLabel.textContent = imageScale.toFixed(1) + 'x';
+        localStorage.setItem('imageScale', imageScale.toString());
     }
     scaleSlider.addEventListener('input', onScaleChange);
     scaleSlider.addEventListener('change', onScaleChange);
@@ -460,13 +463,12 @@
     var touchStartPos = null;
 
     overlay.addEventListener('touchstart', function (e) {
-        if (touchableAreas.length === 0) return;
         touchStartTime = Date.now();
         touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }, { passive: true });
 
     overlay.addEventListener('touchend', function (e) {
-        if (touchableAreas.length === 0 || !touchStartPos) return;
+        if (!touchStartPos) return;
 
         // Accetta come tap solo se il tocco è durato meno di 300ms
         // e il dito non si è spostato più di 15px

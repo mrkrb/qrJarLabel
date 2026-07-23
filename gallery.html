@@ -18,21 +18,19 @@
         <div id="gallery-content">
             <!-- Immagine principale -->
             <div id="main-image-container">
-                <img id="main-image" alt="Immagine principale">
-                <span id="main-label">Immagine principale</span>
+                <img id="main-image" class="hidden" alt="Immagine principale">
+                <div id="main-placeholder">
+                    <span>Tocca per selezionare<br>l'immagine principale</span>
+                </div>
             </div>
 
             <!-- Immagini secondarie -->
-            <div id="extra-section" class="hidden">
-                <h2 id="extra-title">Altre immagini</h2>
-                <div id="extra-grid"></div>
-            </div>
-
-            <!-- Stato vuoto -->
-            <div id="no-extras" class="hidden">
-                <p>Nessuna immagine aggiuntiva.</p>
-            </div>
+            <h2 id="extra-title">Altre immagini</h2>
+            <div id="extra-grid"></div>
         </div>
+
+        <!-- Input file nascosto -->
+        <input type="file" id="file-input" accept="image/*" style="display:none">
 
         <!-- Modale: immagine ingrandita -->
         <div id="modal-fullscreen" class="modal hidden">
@@ -41,7 +39,7 @@
         </div>
     </div>
 
-    <script src="js/db.js?v=2"></script>
-    <script src="js/gallery.js?v=2"></script>
+    <script src="js/db.js?v=3"></script>
+    <script src="js/gallery.js?v=3"></script>
 </body>
 </html>

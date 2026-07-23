@@ -51,24 +51,6 @@ html, body {
     background: rgba(255, 255, 255, 0.05);
 }
 
-#btn-add {
-    font-size: 24px;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    border: none;
-    background: #6366f1;
-    color: #fff;
-    cursor: pointer;
-}
-
-#btn-add:active {
-    background: #4f46e5;
-}
-
 /* Lista */
 #list-container {
     flex: 1;
@@ -129,6 +111,12 @@ html, body {
     margin-top: 2px;
 }
 
+.assoc-extra-count {
+    font-size: 11px;
+    color: #6ee7b7;
+    margin-top: 3px;
+}
+
 .assoc-actions {
     display: flex;
     gap: 8px;
@@ -154,21 +142,6 @@ html, body {
 
 .btn-edit:active {
     background: rgba(99, 102, 241, 0.4);
-}
-
-.btn-add-extra {
-    background: rgba(110, 231, 183, 0.15);
-    color: #6ee7b7;
-}
-
-.btn-add-extra:active {
-    background: rgba(110, 231, 183, 0.3);
-}
-
-.assoc-extra-count {
-    font-size: 11px;
-    color: #6ee7b7;
-    margin-top: 3px;
 }
 
 .btn-delete {
@@ -219,116 +192,6 @@ html, body {
     gap: 12px;
     margin-top: 16px;
     justify-content: center;
-}
-
-/* Camera nel modale scan */
-#scan-camera-container {
-    position: relative;
-    width: 100%;
-    height: 0;
-    padding-bottom: 75%; /* 4:3 aspect ratio fallback */
-    border-radius: 12px;
-    overflow: hidden;
-    background: #000;
-    margin-bottom: 12px;
-}
-
-#scan-video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-#scan-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 60%;
-    height: 60%;
-    transform: translate(-50%, -50%);
-    border: 2px dashed rgba(110, 231, 183, 0.6);
-    border-radius: 8px;
-    pointer-events: none;
-}
-
-#scan-status {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 8px;
-}
-
-#scan-detected {
-    font-size: 15px;
-    color: #6ee7b7;
-    margin-bottom: 12px;
-    word-break: break-all;
-}
-
-#scan-detected.hidden {
-    display: none;
-}
-
-#scan-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-#btn-scan-confirm.hidden {
-    display: none;
-}
-
-/* Upload preview */
-#upload-preview-container {
-    margin: 16px 0;
-}
-
-#upload-preview-container.hidden {
-    display: none;
-}
-
-#upload-preview {
-    max-width: 100%;
-    max-height: 200px;
-    border-radius: 8px;
-    object-fit: contain;
-}
-
-#upload-qr-label {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 16px;
-}
-
-#upload-actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 16px;
-    justify-content: center;
-}
-
-#upload-actions.hidden {
-    display: none;
-}
-
-/* Bottoni */
-.btn-primary {
-    padding: 10px 20px;
-    background: #6366f1;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.btn-primary:active {
-    background: #4f46e5;
 }
 
 .btn-secondary {

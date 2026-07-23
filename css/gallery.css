@@ -79,19 +79,39 @@ html, body {
     cursor: pointer;
 }
 
-#main-label {
-    display: block;
-    text-align: center;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
-    margin-top: 8px;
-}
-
-/* Sezione immagini extra */
-#extra-section.hidden {
+#main-image.hidden {
     display: none;
 }
 
+#main-placeholder {
+    width: 100%;
+    height: 200px;
+    border: 2px dashed rgba(99, 102, 241, 0.5);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: rgba(99, 102, 241, 0.05);
+}
+
+#main-placeholder.hidden {
+    display: none;
+}
+
+#main-placeholder span {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    text-align: center;
+    line-height: 1.5;
+}
+
+#main-placeholder:active {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.8);
+}
+
+/* Sezione immagini extra */
 #extra-title {
     font-size: 15px;
     font-weight: 600;
@@ -101,32 +121,64 @@ html, body {
 
 #extra-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
+}
+
+.extra-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
 }
 
 .extra-thumb {
     width: 100%;
-    aspect-ratio: 1;
+    height: 100%;
     object-fit: cover;
-    border-radius: 10px;
     background: rgba(0, 0, 0, 0.3);
     cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: block;
 }
 
 .extra-thumb:active {
     opacity: 0.7;
 }
 
-#no-extras.hidden {
-    display: none;
+.extra-delete {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(220, 38, 38, 0.85);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-#no-extras {
-    text-align: center;
-    color: rgba(255, 255, 255, 0.4);
-    padding: 20px;
+.extra-add {
+    border: 2px dashed rgba(110, 231, 183, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: rgba(110, 231, 183, 0.05);
+}
+
+.extra-add:active {
+    background: rgba(110, 231, 183, 0.1);
+    border-color: rgba(110, 231, 183, 0.8);
+}
+
+.extra-add span {
+    font-size: 32px;
+    color: rgba(110, 231, 183, 0.6);
 }
 
 /* Modale fullscreen */
